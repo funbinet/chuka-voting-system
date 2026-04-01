@@ -196,6 +196,14 @@ public class AdminResultsPanel extends JPanel {
         chartPanel.setPreferredSize(new Dimension(0, 300));
         panel.add(chartPanel, BorderLayout.CENTER);
 
+        double turnoutPercent = totalEligible > 0 ? (votedCount * 100.0 / totalEligible) : 0;
+        JLabel stats = new JLabel(String.format("<html><b>Total Eligible:</b> %d | <b>Voted:</b> %d | <b>Turnout:</b> %.1f%%</html>", 
+            totalEligible, votedCount, turnoutPercent), JLabel.CENTER);
+        stats.setFont(Constants.FONT_BODY);
+        stats.setForeground(Constants.COLOR_PRIMARY);
+        stats.setBorder(new EmptyBorder(10, 0, 15, 0));
+        panel.add(stats, BorderLayout.SOUTH);
+
         return panel;
     }
 

@@ -36,7 +36,10 @@ public class ElectionService {
         if (!endDate.after(startDate)) {
             return "The end date must be later than the start date.";
         }
-        // Requirement 5: Candidates added directly, no need for pre-existing candidates check
+        
+        if (candidateDAO.countApprovedCandidatesByFaculty(facultyId) == 0) {
+            return "Cannot create election: No approved candidates found for this faculty.";
+        }
         
         if (electionDAO.hasOverlappingElection(facultyId, startDate, endDate)) {
             auditService.log(null, "ELECTION_CREATE_FAILED", "Admin " + adminId + " attempted to create an overlapping election.");

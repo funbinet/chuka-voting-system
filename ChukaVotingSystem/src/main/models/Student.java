@@ -17,6 +17,7 @@ public class Student {
     private boolean   hasDisciplineCase;
     private boolean   isVerified;
     private boolean   isActive;
+    private boolean   isResident;
     private boolean   passwordChanged;
     private Timestamp createdAt;
 
@@ -37,6 +38,7 @@ public class Student {
     public boolean   isHasDisciplineCase() { return hasDisciplineCase; }
     public boolean   isVerified()          { return isVerified; }
     public boolean   isActive()            { return isActive; }
+    public boolean   isResident()          { return isResident; }
     public boolean   isPasswordChanged()   { return passwordChanged; }
     public Timestamp getCreatedAt()        { return createdAt; }
 
@@ -55,6 +57,7 @@ public class Student {
     public void setHasDisciplineCase(boolean v)           { this.hasDisciplineCase = v; }
     public void setVerified(boolean verified)             { this.isVerified       = verified; }
     public void setActive(boolean active)                 { this.isActive         = active; }
+    public void setResident(boolean resident)             { this.isResident       = resident; }
     public void setPasswordChanged(boolean changed)       { this.passwordChanged  = changed; }
     public void setCreatedAt(Timestamp createdAt)         { this.createdAt        = createdAt; }
 

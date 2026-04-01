@@ -207,6 +207,7 @@ public class StudentDAO {
         s.setHasDisciplineCase(rs.getBoolean("has_discipline_case"));
         s.setVerified(rs.getBoolean("is_verified"));
         s.setActive(rs.getBoolean("is_active"));
+        s.setResident(rs.getBoolean("is_resident"));
         s.setPasswordChanged(rs.getBoolean("password_changed"));
         s.setCreatedAt(rs.getTimestamp("created_at"));
         return s;

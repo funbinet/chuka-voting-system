@@ -129,6 +129,16 @@ CREATE TABLE audit_logs (
     FOREIGN KEY (student_id) REFERENCES students(student_id)
 );
 
+CREATE TABLE announcements (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    title      VARCHAR(200) NOT NULL,
+    body       TEXT NOT NULL,
+    posted_by  INT NOT NULL,
+    is_active  BOOLEAN DEFAULT TRUE,
+    posted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (posted_by) REFERENCES admins(admin_id)
+);
+
 -- ============================================
 --   SEED DATA
 -- ============================================
@@ -155,8 +165,7 @@ INSERT INTO students (reg_number, full_name, email, phone_number, password_hash,
 ('ED1/55667/22', 'Irene Nyambura', 'irene.n@chuka.ac.ke', '0700112233', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.55, TRUE, FALSE);
 
 INSERT INTO admins (full_name, email, phone_number, password_hash, password_salt) VALUES
-('System Admin', 'admin@chuka.ac.ke', '0700000000',
- '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff',
+('System Admin', 'admin@chuka.ac.ke', '0700000000','' '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff',
  'AAAAAAAAAAAAAAAAAAAAAA==');
 
 INSERT INTO positions (position_name, faculty_id) VALUES
@@ -165,4 +174,8 @@ INSERT INTO positions (position_name, faculty_id) VALUES
 ('Faculty Secretary', 1), ('Faculty Secretary', 2), ('Faculty Secretary', 3),
 ('Faculty Secretary', 4), ('Faculty Secretary', 5),
 ('Faculty Treasurer', 1), ('Faculty Treasurer', 2), ('Faculty Treasurer', 3),
-('Faculty Treasurer', 4), ('Faculty Treasurer', 5);
+('Faculty Treasurer', 4), ('Faculty Treasurer', 5),
+('Male Resident', 1), ('Male Resident', 2), ('Male Resident', 3), ('Male Resident', 4), ('Male Resident', 5),
+('Female Resident', 1), ('Female Resident', 2), ('Female Resident', 3), ('Female Resident', 4), ('Female Resident', 5),
+('Male Non-Resident', 1), ('Male Non-Resident', 2), ('Male Non-Resident', 3), ('Male Non-Resident', 4), ('Male Non-Resident', 5),
+('Female Non-Resident', 1), ('Female Non-Resident', 2), ('Female Non-Resident', 3), ('Female Non-Resident', 4), ('Female Non-Resident', 5);

@@ -171,19 +171,39 @@ public class ManageElectionsPanel extends JPanel {
                 return;
             }
 
-            String result = electionService.createElection(
-                    titleField.getText().trim(),
-                    faculty.getFacultyId(),
-                    startDate,
-                    endDate,
-                    admin.getAdminId()
-            );
-            JOptionPane.showMessageDialog(dialog, result,
-                    result.toLowerCase().contains("successfully") ? "Election Created" : "Election Error",
-                    result.toLowerCase().contains("successfully") ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
-            if (result.toLowerCase().contains("successfully")) {
-                loadElections();
-                dialog.dispose();
+            if (faculty.getFacultyId() == -1) {
+                int count = 0;
+                int success = 0;
+                StringBuilder errors = new StringBuilder();
+                for (int i = 1; i < facultyCombo.getItemCount(); i++) {
+                    Faculty f = facultyCombo.getItemAt(i);
+                    String res = electionService.createElection(titleField.getText().trim(), f.getFacultyId(), startDate, endDate, admin.getAdminId());
+                    count++;
+                    if (res.toLowerCase().contains("successfully")) success++;
+                    else errors.append("\n- ").append(f.getFacultyName()).append(": ").append(res);
+                }
+                String msg = "Created " + success + " of " + count + " elections.";
+                if (errors.length() > 0) msg += "\nErrors:" + errors.toString();
+                JOptionPane.showMessageDialog(dialog, msg, "Bulk Election Result", success > 0 ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
+                if (success > 0) {
+                    loadElections();
+                    dialog.dispose();
+                }
+            } else {
+                String result = electionService.createElection(
+                        titleField.getText().trim(),
+                        faculty.getFacultyId(),
+                        startDate,
+                        endDate,
+                        admin.getAdminId()
+                );
+                JOptionPane.showMessageDialog(dialog, result,
+                        result.toLowerCase().contains("successfully") ? "Election Created" : "Election Error",
+                        result.toLowerCase().contains("successfully") ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
+                if (result.toLowerCase().contains("successfully")) {
+                    loadElections();
+                    dialog.dispose();
+                }
             }
         });
         panel.add(createBtn, gbc);

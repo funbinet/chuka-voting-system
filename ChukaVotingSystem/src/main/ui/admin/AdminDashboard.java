@@ -149,6 +149,7 @@ public class AdminDashboard extends JFrame {
         card.setBackground(color);
         card.setPreferredSize(new Dimension(180, 130));
         card.setBorder(new EmptyBorder(15, 15, 15, 15));
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         JLabel ico = new JLabel(icon, JLabel.CENTER);
         ico.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 30));
@@ -162,6 +163,22 @@ public class AdminDashboard extends JFrame {
         d.setForeground(new Color(230, 230, 230));
 
         card.add(ico); card.add(t); card.add(d);
+
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                handleMenu(title);
+            }
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                card.setBackground(color.brighter());
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                card.setBackground(color);
+            }
+        });
+
         return card;
     }
 }

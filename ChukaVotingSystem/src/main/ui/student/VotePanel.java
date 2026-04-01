@@ -85,7 +85,11 @@ public class VotePanel extends JPanel {
         positionsPanel.setBackground(Color.WHITE);
 
         for (Map.Entry<String, List<Candidate>> entry : byPosition.entrySet()) {
-            positionsPanel.add(buildPositionSection(election, entry.getKey(), entry.getValue()));
+            String positionName = entry.getKey();
+            if (!student.isResident() && (positionName.equals("Male Resident") || positionName.equals("Female Resident"))) {
+                continue;
+            }
+            positionsPanel.add(buildPositionSection(election, positionName, entry.getValue()));
             positionsPanel.add(Box.createVerticalStrut(10));
         }
 

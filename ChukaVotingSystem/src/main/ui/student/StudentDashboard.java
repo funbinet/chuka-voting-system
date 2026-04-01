@@ -230,6 +230,7 @@ public class StudentDashboard extends JFrame {
         card.setBackground(color);
         card.setPreferredSize(new Dimension(160, 120));
         card.setBorder(new EmptyBorder(15, 15, 15, 15));
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         JLabel iconLabel = new JLabel(icon, JLabel.CENTER);
         iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
@@ -245,6 +246,22 @@ public class StudentDashboard extends JFrame {
         card.add(iconLabel);
         card.add(titleLabel);
         card.add(descLabel);
+
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                handleSidebarClick(title);
+            }
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                card.setBackground(color.brighter());
+            }
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                card.setBackground(color);
+            }
+        });
+
         return card;
     }
 }
