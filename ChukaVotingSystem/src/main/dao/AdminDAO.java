@@ -42,6 +42,7 @@ public class AdminDAO {
         a.setEmail(rs.getString("email"));
         a.setPhoneNumber(rs.getString("phone_number"));
         a.setPasswordHash(rs.getString("password_hash"));
+        a.setPasswordSalt(rs.getString("password_salt"));
         a.setActive(rs.getBoolean("is_active"));
         a.setCreatedAt(rs.getTimestamp("created_at"));
         return a;

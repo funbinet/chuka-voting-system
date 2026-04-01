@@ -3,8 +3,7 @@ package main.utils;
 public class Validator {
 
     public static boolean isValidRegNumber(String regNumber) {
-        // e.g. SCT/2021/001
-        return regNumber != null && regNumber.matches("[A-Z]{2,4}/\\d{4}/\\d{3}");
+        return regNumber != null && regNumber.matches("^[A-Z0-9]{3}/\\d{5}/\\d{2}$");
     }
 
     public static boolean isValidPhone(String phone) {
@@ -33,7 +32,7 @@ public class Validator {
     }
 
     public static boolean meetsMinYear(int year) {
-        return year >= Constants.MIN_YEAR_OF_STUDY;
+        return year >= Constants.MIN_YEAR_OF_STUDY && year <= 6;
     }
 
     public static boolean isEmpty(String value) {

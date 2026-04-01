@@ -9,6 +9,7 @@ public class Student {
     private String    email;
     private String    phoneNumber;
     private String    passwordHash;
+    private String    passwordSalt;
     private int       facultyId;
     private String    facultyName;
     private int       yearOfStudy;
@@ -16,6 +17,7 @@ public class Student {
     private boolean   hasDisciplineCase;
     private boolean   isVerified;
     private boolean   isActive;
+    private boolean   passwordChanged;
     private Timestamp createdAt;
 
     public Student() {}
@@ -27,6 +29,7 @@ public class Student {
     public String    getEmail()            { return email; }
     public String    getPhoneNumber()      { return phoneNumber; }
     public String    getPasswordHash()     { return passwordHash; }
+    public String    getPasswordSalt()     { return passwordSalt; }
     public int       getFacultyId()        { return facultyId; }
     public String    getFacultyName()      { return facultyName; }
     public int       getYearOfStudy()      { return yearOfStudy; }
@@ -34,6 +37,7 @@ public class Student {
     public boolean   isHasDisciplineCase() { return hasDisciplineCase; }
     public boolean   isVerified()          { return isVerified; }
     public boolean   isActive()            { return isActive; }
+    public boolean   isPasswordChanged()   { return passwordChanged; }
     public Timestamp getCreatedAt()        { return createdAt; }
 
     // Setters
@@ -43,6 +47,7 @@ public class Student {
     public void setEmail(String email)                    { this.email            = email; }
     public void setPhoneNumber(String phoneNumber)        { this.phoneNumber      = phoneNumber; }
     public void setPasswordHash(String passwordHash)      { this.passwordHash     = passwordHash; }
+    public void setPasswordSalt(String salt)              { this.passwordSalt     = salt; }
     public void setFacultyId(int facultyId)               { this.facultyId        = facultyId; }
     public void setFacultyName(String facultyName)        { this.facultyName      = facultyName; }
     public void setYearOfStudy(int yearOfStudy)           { this.yearOfStudy      = yearOfStudy; }
@@ -50,16 +55,8 @@ public class Student {
     public void setHasDisciplineCase(boolean v)           { this.hasDisciplineCase = v; }
     public void setVerified(boolean verified)             { this.isVerified       = verified; }
     public void setActive(boolean active)                 { this.isActive         = active; }
+    public void setPasswordChanged(boolean changed)       { this.passwordChanged  = changed; }
     public void setCreatedAt(Timestamp createdAt)         { this.createdAt        = createdAt; }
-
-    // Eligibility check for candidacy
-    public boolean isEligibleForCandidacy() {
-        return !hasDisciplineCase &&
-               gpa >= main.utils.Constants.MIN_GPA &&
-               yearOfStudy >= main.utils.Constants.MIN_YEAR_OF_STUDY &&
-               isVerified &&
-               isActive;
-    }
 
     @Override
     public String toString() {

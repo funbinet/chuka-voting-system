@@ -1,6 +1,7 @@
 package main.dao;
 
 import main.utils.DBConfig;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -9,20 +10,24 @@ public class DBConnection {
 
     private static DBConnection instance;
     private Connection connection;
+    private String lastError;
 
     private DBConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
             this.connection = DriverManager.getConnection(
-                DBConfig.URL,
-                DBConfig.USERNAME,
-                DBConfig.PASSWORD
+                    DBConfig.URL,
+                    DBConfig.USERNAME,
+                    DBConfig.PASSWORD
             );
-            System.out.println("✅ Database connected successfully!");
+            this.lastError = null;
+            System.out.println("Database connected successfully.");
         } catch (ClassNotFoundException e) {
-            System.err.println("❌ MySQL Driver not found: " + e.getMessage());
+            this.lastError = "MySQL JDBC driver not found. Ensure mysql-connector-j is on the classpath.";
+            System.err.println(this.lastError);
         } catch (SQLException e) {
-            System.err.println("❌ Database connection failed: " + e.getMessage());
+            this.lastError = "Database connection failed: " + e.getMessage();
+            System.err.println(this.lastError);
         }
     }
 
@@ -37,6 +42,10 @@ public class DBConnection {
         return connection;
     }
 
+    public String getLastError() {
+        return lastError;
+    }
+
     private static boolean isConnectionClosed() {
         try {
             return instance.connection == null || instance.connection.isClosed();
@@ -49,10 +58,10 @@ public class DBConnection {
         try {
             if (connection != null && !connection.isClosed()) {
                 connection.close();
-                System.out.println("🔌 Connection closed.");
+                System.out.println("Connection closed.");
             }
         } catch (SQLException e) {
-            System.err.println("❌ Error closing connection: " + e.getMessage());
+            System.err.println("Error closing connection: " + e.getMessage());
         }
     }
 }

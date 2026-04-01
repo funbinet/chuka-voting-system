@@ -25,12 +25,14 @@ CREATE TABLE students (
     email               VARCHAR(100) NOT NULL UNIQUE,
     phone_number        VARCHAR(15)  NOT NULL UNIQUE,
     password_hash       VARCHAR(255) NOT NULL,
+    password_salt       VARCHAR(50)  NOT NULL,
     faculty_id          INT          NOT NULL,
     year_of_study       INT          NOT NULL,
     gpa                 DECIMAL(3,2) DEFAULT 0.00,
     has_discipline_case BOOLEAN      DEFAULT FALSE,
     is_verified         BOOLEAN      DEFAULT FALSE,
     is_active           BOOLEAN      DEFAULT TRUE,
+    password_changed    BOOLEAN      DEFAULT FALSE,
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (faculty_id) REFERENCES faculties(faculty_id)
 );
@@ -41,6 +43,7 @@ CREATE TABLE admins (
     email         VARCHAR(100) NOT NULL UNIQUE,
     phone_number  VARCHAR(15)  NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_salt VARCHAR(50)  NOT NULL,
     is_active     BOOLEAN      DEFAULT TRUE,
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
@@ -133,12 +136,28 @@ INSERT INTO faculties (faculty_code, faculty_name) VALUES
 ('FET',  'Faculty of Engineering and Technology'),
 ('FBE',  'Faculty of Business and Economics'),
 ('FHSS', 'Faculty of Humanities and Social Sciences'),
-('FES',  'Faculty of Education Studies'),
-('FNAS', 'Faculty of Natural and Applied Sciences');
+('Faculty of Education Studies'),
+('Faculty of Natural and Applied Sciences');
 
-INSERT INTO admins (full_name, email, phone_number, password_hash) VALUES
+-- Sample Students (Password: Student@123)
+-- Hash: 5ea99453f4712f50a409c7177a8e0436da4352a8e830b037f2ba0966320b6900
+-- Salt: AAAAAAAAAAAAAAAAAAAAAA==
+INSERT INTO students (reg_number, full_name, email, phone_number, password_hash, password_salt, faculty_id, year_of_study, gpa, is_verified, password_changed) VALUES
+('EB1/66840/23', 'John Doe', 'john.doe@chuka.ac.ke', '0711111111', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.50, TRUE, FALSE),
+('CS1/12345/22', 'Alice Smith', 'alice.smith@chuka.ac.ke', '0722222222', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.85, TRUE, FALSE),
+('BE1/55443/23', 'Bob Johnson', 'bob.johnson@chuka.ac.ke', '0733333333', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.20, TRUE, FALSE),
+('HS1/99887/21', 'Catherine Mwangi', 'catherine.m@chuka.ac.ke', '0744444444', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.90, TRUE, FALSE),
+('ED1/11223/22', 'David Omondi', 'david.o@chuka.ac.ke', '0755555555', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.45, TRUE, FALSE),
+('EB1/77665/23', 'Eve Wambui', 'eve.w@chuka.ac.ke', '0766666666', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.10, TRUE, FALSE),
+('CS1/88990/22', 'Franklin Mutua', 'franklin.m@chuka.ac.ke', '0777777777', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.65, TRUE, FALSE),
+('BE1/44332/23', 'Grace Atieno', 'grace.a@chuka.ac.ke', '0788888888', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.75, TRUE, FALSE),
+('HS1/22334/21', 'Henry Kiprotich', 'henry.k@chuka.ac.ke', '0799999999', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.30, TRUE, FALSE),
+('ED1/55667/22', 'Irene Nyambura', 'irene.n@chuka.ac.ke', '0700112233', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.55, TRUE, FALSE);
+
+INSERT INTO admins (full_name, email, phone_number, password_hash, password_salt) VALUES
 ('System Admin', 'admin@chuka.ac.ke', '0700000000',
- SHA2('Admin@1234', 256));
+ '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff',
+ 'AAAAAAAAAAAAAAAAAAAAAA==');
 
 INSERT INTO positions (position_name, faculty_id) VALUES
 ('Faculty Chairman', 1), ('Faculty Chairman', 2), ('Faculty Chairman', 3),

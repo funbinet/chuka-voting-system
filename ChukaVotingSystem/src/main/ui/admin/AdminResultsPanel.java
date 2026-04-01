@@ -1,130 +1,236 @@
 package main.ui.admin;
 
+import main.dao.StudentDAO;
 import main.models.Candidate;
 import main.models.Election;
 import main.services.ElectionService;
 import main.services.VotingService;
 import main.utils.Constants;
+import main.utils.ResultsPDFExporter;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AdminResultsPanel extends JPanel {
 
     private ElectionService electionService;
     private VotingService   votingService;
+    private StudentDAO      studentDAO;
+
+    private JComboBox<Election> electionCombo;
+    private JPanel chartsContainer;
+    private JPanel summaryPanel;
 
     public AdminResultsPanel() {
         this.electionService = new ElectionService();
         this.votingService   = new VotingService();
+        this.studentDAO      = new StudentDAO();
+        
         setBackground(Constants.COLOR_BG);
         setLayout(new BorderLayout());
-        setBorder(new EmptyBorder(10, 10, 10, 10));
-        buildUI();
+        setBorder(new EmptyBorder(20, 20, 20, 20));
+        
+        initTopPanel();
+        
+        chartsContainer = new JPanel();
+        chartsContainer.setLayout(new BoxLayout(chartsContainer, BoxLayout.Y_AXIS));
+        chartsContainer.setBackground(Constants.COLOR_BG);
+        
+        JScrollPane scrollPane = new JScrollPane(chartsContainer);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        
+        add(scrollPane, BorderLayout.CENTER);
+        
+        refreshElectionList();
     }
 
-    private void buildUI() {
-        JLabel heading = new JLabel("📊 Election Results — All Faculties");
-        heading.setFont(Constants.FONT_HEADING);
-        heading.setForeground(Constants.COLOR_PRIMARY);
-        heading.setBorder(new EmptyBorder(0, 0, 15, 0));
-        add(heading, BorderLayout.NORTH);
+    private void initTopPanel() {
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBackground(Constants.COLOR_BG);
+        topPanel.setBorder(new EmptyBorder(0, 0, 20, 0));
 
+        JLabel title = new JLabel("📊 Election Visual Analytics");
+        title.setFont(Constants.FONT_TITLE);
+        topPanel.add(title, BorderLayout.WEST);
+
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        controls.setBackground(Constants.COLOR_BG);
+
+        electionCombo = new JComboBox<>();
+        electionCombo.setPreferredSize(new Dimension(300, 35));
+        electionCombo.addActionListener(e -> loadElectionData());
+
+        JButton exportPdfBtn = new JButton("📄 Export PDF");
+        exportPdfBtn.setFont(Constants.FONT_BUTTON);
+        exportPdfBtn.setBackground(Constants.COLOR_SECONDARY);
+        exportPdfBtn.setForeground(Color.WHITE);
+        exportPdfBtn.addActionListener(e -> handleExportPDF());
+
+        JButton refreshBtn = new JButton("🔄 Refresh Data");
+        refreshBtn.setFont(Constants.FONT_BUTTON);
+        refreshBtn.addActionListener(e -> refreshElectionList());
+
+        controls.add(new JLabel("Select Election: "));
+        controls.add(electionCombo);
+        controls.add(exportPdfBtn);
+        controls.add(refreshBtn);
+
+        topPanel.add(controls, BorderLayout.EAST);
+        add(topPanel, BorderLayout.NORTH);
+    }
+
+    private void handleExportPDF() {
+        Election election = (Election) electionCombo.getSelectedItem();
+        if (election == null) return;
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Election Results PDF");
+        fileChooser.setSelectedFile(new File(election.getTitle().replace(" ", "_") + "_Results.pdf"));
+
+        if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            try {
+                List<Candidate> candidates = votingService.getCandidatesForElection(election.getElectionId());
+                Map<Integer, Integer> voteData = new HashMap<>();
+                
+                // Aggregate all results for the PDF
+                for (Candidate c : candidates) {
+                    Map<Integer, Integer> posResults = votingService.getResults(election.getElectionId(), c.getPositionId());
+                    voteData.putAll(posResults);
+                }
+
+                int totalEligible = studentDAO.getTotalStudentsByFaculty(election.getFacultyId());
+                
+                ResultsPDFExporter.exportElectionResults(election, candidates, voteData, totalEligible, file);
+                
+                JOptionPane.showMessageDialog(this, "✅ PDF Exported Successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "❌ Failed to export PDF: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private void refreshElectionList() {
         electionService.syncElectionStatuses();
         List<Election> elections = electionService.getAllElections();
-
-        if (elections.isEmpty()) {
-            add(new JLabel("No elections found."), BorderLayout.CENTER);
-            return;
+        
+        electionCombo.removeAllItems();
+        for (Election e : elections) {
+            if (!Constants.STATUS_UPCOMING.equals(e.getStatus())) {
+                electionCombo.addItem(e);
+            }
         }
-
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(Constants.COLOR_BG);
-
-        for (Election election : elections) {
-            panel.add(buildElectionBlock(election));
-            panel.add(Box.createVerticalStrut(15));
+        
+        if (electionCombo.getItemCount() > 0) {
+            loadElectionData();
+        } else {
+            chartsContainer.removeAll();
+            chartsContainer.add(new JLabel("No active or closed elections found."));
+            chartsContainer.revalidate();
+            chartsContainer.repaint();
         }
-
-        add(new JScrollPane(panel), BorderLayout.CENTER);
     }
 
-    private JPanel buildElectionBlock(Election election) {
-        JPanel card = new JPanel(new BorderLayout());
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Constants.COLOR_PRIMARY, 2),
-            new EmptyBorder(12, 12, 12, 12)
-        ));
+    private void loadElectionData() {
+        Election election = (Election) electionCombo.getSelectedItem();
+        if (election == null) return;
 
-        JPanel titleBar = new JPanel(new BorderLayout());
-        titleBar.setBackground(Constants.COLOR_PRIMARY);
-        titleBar.setBorder(new EmptyBorder(6, 10, 6, 10));
+        chartsContainer.removeAll();
+        
+        // 1. Voter Turnout Summary (Pie Chart)
+        chartsContainer.add(createTurnoutPanel(election));
+        chartsContainer.add(Box.createVerticalStrut(20));
 
-        JLabel title = new JLabel(election.getTitle() + " | " + election.getFacultyName());
-        title.setFont(Constants.FONT_BUTTON);
-        title.setForeground(Color.WHITE);
-
-        JLabel statusLabel = new JLabel("[" + election.getStatus() + "]");
-        statusLabel.setFont(Constants.FONT_SMALL);
-        statusLabel.setForeground(Constants.COLOR_ACCENT);
-
-        JLabel turnout = new JLabel("Voters: " + votingService.getTurnout(election.getElectionId()));
-        turnout.setFont(Constants.FONT_SMALL);
-        turnout.setForeground(Color.WHITE);
-
-        titleBar.add(title, BorderLayout.WEST);
-        titleBar.add(turnout, BorderLayout.CENTER);
-        titleBar.add(statusLabel, BorderLayout.EAST);
-
+        // 2. Position-wise Results (Bar Charts)
         List<Candidate> candidates = votingService.getCandidatesForElection(election.getElectionId());
         Map<String, List<Candidate>> byPosition = new LinkedHashMap<>();
         for (Candidate c : candidates) {
             byPosition.computeIfAbsent(c.getPositionName(), k -> new ArrayList<>()).add(c);
         }
 
-        JPanel resultsPanel = new JPanel(new GridLayout(0, 1, 5, 5));
-        resultsPanel.setBackground(Color.WHITE);
-        resultsPanel.setBorder(new EmptyBorder(10, 0, 0, 0));
-
         for (Map.Entry<String, List<Candidate>> entry : byPosition.entrySet()) {
-            resultsPanel.add(buildPositionBlock(election, entry.getKey(), entry.getValue()));
+            chartsContainer.add(createPositionChart(election, entry.getKey(), entry.getValue()));
+            chartsContainer.add(Box.createVerticalStrut(20));
         }
 
-        card.add(titleBar, BorderLayout.NORTH);
-        card.add(resultsPanel, BorderLayout.CENTER);
-        return card;
+        chartsContainer.revalidate();
+        chartsContainer.repaint();
     }
 
-    private JPanel buildPositionBlock(Election election, String position, List<Candidate> candidates) {
-        JPanel panel = new JPanel(new GridLayout(0, 1, 3, 3));
-        panel.setBackground(new Color(245, 250, 255));
-        panel.setBorder(BorderFactory.createTitledBorder(position));
+    private JPanel createTurnoutPanel(Election election) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createTitledBorder("Voter Turnout Analysis"));
 
-        Map<Integer, Integer> votes = votingService.getResults(
-            election.getElectionId(), candidates.get(0).getPositionId());
+        int votedCount = votingService.getTurnout(election.getElectionId());
+        int totalEligible = studentDAO.getTotalStudentsByFaculty(election.getFacultyId());
+        int nonVoters = Math.max(0, totalEligible - votedCount);
 
-        candidates.sort((a, b) ->
-            votes.getOrDefault(b.getApplicationId(), 0) -
-            votes.getOrDefault(a.getApplicationId(), 0));
+        DefaultPieDataset dataset = new DefaultPieDataset();
+        dataset.setValue("Voted (" + votedCount + ")", votedCount);
+        dataset.setValue("Did Not Vote (" + nonVoters + ")", nonVoters);
 
-        int total = votes.values().stream().mapToInt(Integer::intValue).sum();
-        boolean first = true;
+        JFreeChart chart = ChartFactory.createPieChart(
+                "Overall Turnout for " + election.getTitle(),
+                dataset, true, true, false);
+
+        ChartPanel chartPanel = new ChartPanel(chart);
+        chartPanel.setPreferredSize(new Dimension(0, 300));
+        panel.add(chartPanel, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createPositionChart(Election election, String positionName, List<Candidate> candidates) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createTitledBorder("Results for: " + positionName));
+
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        Map<Integer, Integer> results = votingService.getResults(election.getElectionId(), candidates.get(0).getPositionId());
+        
+        int totalVotesForPosition = results.values().stream().mapToInt(Integer::intValue).sum();
 
         for (Candidate c : candidates) {
-            int count = votes.getOrDefault(c.getApplicationId(), 0);
-            int pct   = total == 0 ? 0 : count * 100 / total;
-            String prefix = first ? "🥇 " : "   ";
-            JLabel lbl = new JLabel(prefix + c.getStudentName() + " — " + count + " votes (" + pct + "%)");
-            lbl.setFont(first ? Constants.FONT_BUTTON : Constants.FONT_BODY);
-            lbl.setForeground(first ? Constants.COLOR_SUCCESS : Constants.COLOR_TEXT);
-            panel.add(lbl);
-            first = false;
+            int votes = results.getOrDefault(c.getApplicationId(), 0);
+            dataset.addValue(votes, "Votes", c.getStudentName());
         }
+
+        JFreeChart barChart = ChartFactory.createBarChart(
+                positionName + " Statistics",
+                "Candidate",
+                "Number of Votes",
+                dataset,
+                PlotOrientation.HORIZONTAL,
+                false, true, false);
+
+        // Styling and Labels
+        BarRenderer renderer = (BarRenderer) barChart.getCategoryPlot().getRenderer();
+        renderer.setBaseItemLabelGenerator(new StandardCategoryItemLabelGenerator());
+        renderer.setBaseItemLabelsVisible(true);
+        renderer.setSeriesPaint(0, Constants.COLOR_PRIMARY);
+
+        ChartPanel chartPanel = new ChartPanel(barChart);
+        chartPanel.setPreferredSize(new Dimension(0, Math.max(250, candidates.size() * 50)));
+        panel.add(chartPanel, BorderLayout.CENTER);
 
         return panel;
     }

@@ -96,8 +96,8 @@ public class VotePanel extends JPanel {
 
     private JPanel buildPositionSection(Election election, String positionName, List<Candidate> candidates) {
         JPanel section = new JPanel(new BorderLayout());
-        section.setBackground(new Color(245, 248, 255));
-        section.setBorder(new EmptyBorder(8, 8, 8, 8));
+        section.setBackground(Color.WHITE);
+        section.setBorder(new EmptyBorder(15, 0, 15, 0));
 
         boolean alreadyVoted = candidates.isEmpty() ? false :
             votingService.hasVoted(student.getStudentId(), election.getElectionId(), candidates.get(0).getPositionId());
@@ -105,60 +105,130 @@ public class VotePanel extends JPanel {
         JLabel posLabel = new JLabel("🏷️ " + positionName + (alreadyVoted ? "  ✅ Voted" : ""));
         posLabel.setFont(Constants.FONT_BUTTON);
         posLabel.setForeground(Constants.COLOR_PRIMARY);
+        posLabel.setBorder(new EmptyBorder(0, 0, 10, 0));
 
-        JPanel candidatesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        candidatesPanel.setBackground(new Color(245, 248, 255));
+        JPanel cardsContainer = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        cardsContainer.setBackground(Color.WHITE);
 
-        ButtonGroup group = new ButtonGroup();
-        List<JRadioButton> radioButtons = new ArrayList<>();
+        final Candidate[] selectedCandidate = {null};
+        List<JPanel> cardPanels = new ArrayList<>();
 
         for (Candidate c : candidates) {
-            JRadioButton rb = new JRadioButton("<html><b>" + c.getStudentName() + "</b><br><small>" + c.getRegNumber() + "</small></html>");
-            rb.setFont(Constants.FONT_BODY);
-            rb.setBackground(new Color(245, 248, 255));
-            rb.putClientProperty("candidate", c);
-            rb.setEnabled(!alreadyVoted);
-            group.add(rb);
-            radioButtons.add(rb);
-            candidatesPanel.add(rb);
+            JPanel card = createCandidateCard(c, alreadyVoted);
+            cardPanels.add(card);
+            
+            if (!alreadyVoted) {
+                card.addMouseListener(new java.awt.event.MouseAdapter() {
+                    @Override
+                    public void mousePressed(java.awt.event.MouseEvent e) {
+                        // Reset all cards
+                        for (JPanel p : cardPanels) {
+                            p.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
+                            p.setBackground(new Color(252, 252, 252));
+                        }
+                        // Highlight selected
+                        card.setBorder(BorderFactory.createLineBorder(Constants.COLOR_ACCENT, 3));
+                        card.setBackground(new Color(240, 245, 255));
+                        selectedCandidate[0] = c;
+                    }
+                });
+            }
+            cardsContainer.add(card);
         }
 
-        JButton voteBtn = new JButton(alreadyVoted ? "✅ Already Voted" : "Cast Vote");
+        JButton voteBtn = new JButton(alreadyVoted ? "✅ Vote Recorded" : "Cast Vote for " + positionName);
         voteBtn.setFont(Constants.FONT_BUTTON);
         voteBtn.setBackground(alreadyVoted ? Constants.COLOR_SUCCESS : Constants.COLOR_ACCENT);
         voteBtn.setForeground(Color.WHITE);
-        voteBtn.setFocusPainted(false);
-        voteBtn.setBorderPainted(false);
+        voteBtn.setPreferredSize(new Dimension(250, 45));
         voteBtn.setEnabled(!alreadyVoted);
 
         voteBtn.addActionListener(e -> {
-            JRadioButton selected = radioButtons.stream().filter(AbstractButton::isSelected).findFirst().orElse(null);
-            if (selected == null) {
-                JOptionPane.showMessageDialog(this, "Please select a candidate.", "Select Candidate", JOptionPane.WARNING_MESSAGE);
+            if (selectedCandidate[0] == null) {
+                JOptionPane.showMessageDialog(this, "Please select a candidate card first.", "Selection Required", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            Candidate chosen = (Candidate) selected.getClientProperty("candidate");
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Confirm your vote for " + chosen.getStudentName() + " as " + positionName + "?",
+                "Confirm your vote for " + selectedCandidate[0].getStudentName() + "?",
                 "Confirm Vote", JOptionPane.YES_NO_OPTION);
+            
             if (confirm == JOptionPane.YES_OPTION) {
                 String result = votingService.castVote(
                     student.getStudentId(), election.getElectionId(),
-                    chosen.getPositionId(), chosen.getApplicationId()
+                    selectedCandidate[0].getPositionId(), selectedCandidate[0].getApplicationId()
                 );
                 JOptionPane.showMessageDialog(this, result);
                 if (result.startsWith("✅")) {
-                    voteBtn.setText("✅ Voted");
+                    voteBtn.setText("✅ Vote Recorded");
                     voteBtn.setBackground(Constants.COLOR_SUCCESS);
                     voteBtn.setEnabled(false);
-                    radioButtons.forEach(rb -> rb.setEnabled(false));
+                    // Disable all cards
+                    for (JPanel p : cardPanels) {
+                        p.setEnabled(false);
+                        for (Component comp : p.getComponents()) comp.setEnabled(false);
+                    }
                 }
             }
         });
 
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        bottomPanel.setBackground(Color.WHITE);
+        bottomPanel.add(voteBtn);
+
         section.add(posLabel, BorderLayout.NORTH);
-        section.add(candidatesPanel, BorderLayout.CENTER);
-        section.add(voteBtn, BorderLayout.EAST);
+        section.add(cardsContainer, BorderLayout.CENTER);
+        section.add(bottomPanel, BorderLayout.SOUTH);
+        
         return section;
+    }
+
+    private JPanel createCandidateCard(Candidate c, boolean alreadyVoted) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setPreferredSize(new Dimension(200, 180));
+        card.setBackground(new Color(252, 252, 252));
+        card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
+        card.setCursor(alreadyVoted ? Cursor.getDefaultCursor() : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        JLabel nameLbl = new JLabel(c.getStudentName());
+        nameLbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        nameLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel regLbl = new JLabel(c.getRegNumber());
+        regLbl.setFont(Constants.FONT_SMALL);
+        regLbl.setForeground(Color.GRAY);
+        regLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel yearLbl = new JLabel("Year " + c.getYearOfStudy());
+        yearLbl.setFont(Constants.FONT_SMALL);
+        yearLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton viewBtn = new JButton("View Manifesto");
+        viewBtn.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        viewBtn.setMargin(new Insets(2, 5, 2, 5));
+        viewBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        viewBtn.addActionListener(e -> {
+            JTextArea textArea = new JTextArea(c.getManifesto());
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setEditable(false);
+            textArea.setRows(15);
+            textArea.setColumns(30);
+            
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            JOptionPane.showMessageDialog(this, scrollPane, c.getStudentName() + "'s Manifesto", JOptionPane.PLAIN_MESSAGE);
+        });
+
+        card.add(Box.createVerticalGlue());
+        card.add(new JLabel("👤") {{ setFont(new Font("Serif", Font.PLAIN, 40)); setAlignmentX(0.5f); }});
+        card.add(Box.createVerticalStrut(10));
+        card.add(nameLbl);
+        card.add(regLbl);
+        card.add(yearLbl);
+        card.add(Box.createVerticalStrut(10));
+        card.add(viewBtn);
+        card.add(Box.createVerticalGlue());
+
+        return card;
     }
 }

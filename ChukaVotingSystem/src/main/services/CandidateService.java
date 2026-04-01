@@ -1,6 +1,7 @@
 package main.services;
 
 import main.dao.CandidateDAO;
+import main.dao.StudentDAO;
 import main.models.Candidate;
 import main.models.Student;
 import main.utils.Constants;
@@ -9,62 +10,84 @@ import java.util.List;
 
 public class CandidateService {
 
-    private CandidateDAO candidateDAO;
+    private final CandidateDAO candidateDAO;
+    private final StudentDAO studentDAO;
+    private final AuditService auditService;
+    private String lastMessage;
 
     public CandidateService() {
         this.candidateDAO = new CandidateDAO();
+        this.studentDAO = new StudentDAO();
+        this.auditService = AuditService.getInstance();
+        this.lastMessage = "";
     }
 
-    // Student applies — checks eligibility first
-    public String applyForCandidacy(Student student, int positionId, String manifesto) {
-        // Check eligibility
-        if (!student.isEligibleForCandidacy()) {
-            StringBuilder reason = new StringBuilder("❌ You are not eligible:\n");
-            if (student.isHasDisciplineCase())
-                reason.append("• You have an active discipline case.\n");
-            if (student.getGpa() < Constants.MIN_GPA)
-                reason.append("• Your GPA (").append(student.getGpa())
-                      .append(") is below the minimum (").append(Constants.MIN_GPA).append(").\n");
-            if (student.getYearOfStudy() < Constants.MIN_YEAR_OF_STUDY)
-                reason.append("• First year students cannot run for positions.\n");
-            if (!student.isVerified())
-                reason.append("• Your account phone number is not verified.\n");
-            return reason.toString();
+    public String addCandidateDirectly(String regNumber, int positionId, String manifesto, int adminId) {
+        Student student = studentDAO.findByRegNumber(regNumber);
+        if (student == null) {
+            lastMessage = "Student with registration number " + regNumber + " not found.";
+            return lastMessage;
         }
 
-        // Check if already applied for this position
-        if (candidateDAO.hasApplied(student.getStudentId(), positionId)) {
-            return "❌ You have already applied for this position.";
+        Integer positionFacultyId = candidateDAO.findFacultyIdByPosition(positionId);
+        if (positionFacultyId == null) {
+            lastMessage = "The selected position could not be found.";
+            return lastMessage;
         }
 
-        if (manifesto == null || manifesto.trim().isEmpty()) {
-            return "❌ Please provide a manifesto.";
+        if (positionFacultyId != student.getFacultyId()) {
+            lastMessage = "The student and position must be in the same faculty.";
+            return lastMessage;
         }
 
-        boolean success = candidateDAO.applyForCandidacy(student.getStudentId(), positionId, manifesto);
-        return success
-            ? "✅ Application submitted! Awaiting admin review and peer nominations."
-            : "❌ Application failed. Please try again.";
+        if (candidateDAO.hasAnyActiveApplication(student.getStudentId())) {
+            lastMessage = "This student is already a candidate in the system.";
+            return lastMessage;
+        }
+
+        boolean success = candidateDAO.applyForCandidacy(student.getStudentId(), positionId, manifesto != null ? manifesto.trim() : "");
+        if (!success) {
+            lastMessage = "Failed to add the candidate application.";
+            return lastMessage;
+        }
+
+        // Get the newly created application ID
+        List<Candidate> pending = candidateDAO.getPendingApplications();
+        int applicationId = -1;
+        for (Candidate c : pending) {
+            if (c.getStudentId() == student.getStudentId() && c.getPositionId() == positionId) {
+                applicationId = c.getApplicationId();
+                break;
+            }
+        }
+
+        if (applicationId == -1) {
+             lastMessage = "Candidate added but could not retrieve application ID for immediate approval.";
+             return lastMessage;
+        }
+
+        // Auto-approve since admin is adding directly
+        boolean approved = candidateDAO.approveApplication(applicationId, adminId);
+        if (approved) {
+            int targetElectionId = candidateDAO.getTargetElectionId(student.getFacultyId());
+            if (targetElectionId != -1) {
+                candidateDAO.addCandidateToElection(targetElectionId, applicationId);
+                lastMessage = "Candidate added and approved for the upcoming election successfully.";
+            } else {
+                lastMessage = "Candidate added and approved successfully (no active election found to link yet).";
+            }
+            auditService.log(null, "CANDIDATE_ADDED_BY_ADMIN", 
+                "Admin " + adminId + " added " + student.getFullName() + " as a candidate for position " + positionId);
+        } else {
+            lastMessage = "Candidate added but auto-approval failed.";
+        }
+
+        return lastMessage;
     }
 
-    // Peer nomination
-    public String nominateCandidate(int applicationId, int nominatingStudentId) {
-        boolean success = candidateDAO.nominateCandidate(applicationId, nominatingStudentId);
-        return success ? "✅ Nomination recorded!" : "❌ You may have already nominated this candidate.";
-    }
-
-    // Admin approve
-    public boolean approveApplication(int applicationId, int adminId) {
-        return candidateDAO.approveApplication(applicationId, adminId);
-    }
-
-    // Admin reject
-    public boolean rejectApplication(int applicationId, int adminId, String reason) {
-        return candidateDAO.rejectApplication(applicationId, adminId, reason);
-    }
-
-    public List<Candidate> getPendingApplications() {
-        return candidateDAO.getPendingApplications();
+    public List<Candidate> getAllApprovedCandidates() {
+        // We'll just return all approved candidates across all faculties
+        return candidateDAO.getApprovedCandidatesAcrossFaculties();
     }
 
     public List<Candidate> getApprovedCandidatesByFaculty(int facultyId) {
@@ -73,5 +96,22 @@ public class CandidateService {
 
     public List<Candidate> getCandidatesForElection(int electionId) {
         return candidateDAO.getCandidatesForElection(electionId);
+    }
+
+    public List<Candidate> getPendingApplications() {
+        return candidateDAO.getPendingApplications();
+    }
+
+    public boolean removeCandidate(int applicationId, int adminId) {
+        // Implementation for removing/rejecting an already approved candidate if needed
+        boolean ok = candidateDAO.rejectApplication(applicationId, adminId, "Removed by administrator.");
+        if (ok) {
+            auditService.log(null, "CANDIDATE_REMOVED", "Admin " + adminId + " removed candidate application " + applicationId);
+        }
+        return ok;
+    }
+
+    public String getLastMessage() {
+        return lastMessage;
     }
 }

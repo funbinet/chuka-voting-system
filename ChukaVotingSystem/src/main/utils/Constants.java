@@ -8,11 +8,13 @@ public class Constants {
     // OTP
     public static final int    OTP_LENGTH      = 6;
     public static final int    OTP_EXPIRY_MINS = 5;
+    public static final int    OTP_MAX_ATTEMPTS = 3;
 
     // Candidate Eligibility
     public static final double MIN_GPA           = 2.5;
     public static final int    MIN_YEAR_OF_STUDY = 2;
     public static final int    MIN_NOMINATIONS   = 10;
+    public static final int    MIN_MANIFESTO_LENGTH = 50;
 
     // Election Status
     public static final String STATUS_UPCOMING = "UPCOMING";

@@ -1,22 +1,31 @@
 package main.ui.student;
 
+import main.models.Election;
 import main.models.Student;
 import main.services.AuthService;
+import main.services.ElectionService;
 import main.ui.LoginFrame;
 import main.utils.Constants;
+import main.utils.SessionManager;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 
 public class StudentDashboard extends JFrame {
 
-    private Student student;
-    private JPanel  contentPanel;
+    private Student         student;
+    private JPanel          contentPanel;
+    private ElectionService electionService;
 
     public StudentDashboard(Student student) {
-        this.student = student;
+        this.student         = student;
+        this.electionService = new ElectionService();
         initUI();
+        SessionManager.getInstance().startSession(this);
     }
 
     private void initUI() {
@@ -46,14 +55,14 @@ public class StudentDashboard extends JFrame {
         topBar.setBackground(Constants.COLOR_PRIMARY);
         topBar.setBorder(new EmptyBorder(10, 20, 10, 20));
 
-        JLabel title = new JLabel("🎓 " + Constants.APP_NAME);
+        JLabel title = new JLabel("\uD83C\uDF13 " + Constants.APP_NAME);
         title.setFont(Constants.FONT_HEADING);
         title.setForeground(Color.WHITE);
 
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         rightPanel.setBackground(Constants.COLOR_PRIMARY);
 
-        JLabel userLabel = new JLabel("👤 " + student.getFullName() + " | " + student.getFacultyName());
+        JLabel userLabel = new JLabel("\uD83D\uDC64 " + student.getFullName() + " | " + student.getFacultyName());
         userLabel.setFont(Constants.FONT_SMALL);
         userLabel.setForeground(Constants.COLOR_ACCENT);
 
@@ -64,6 +73,7 @@ public class StudentDashboard extends JFrame {
         logoutBtn.setFocusPainted(false);
         logoutBtn.setBorderPainted(false);
         logoutBtn.addActionListener(e -> {
+            SessionManager.getInstance().stopSession();
             AuthService.logout();
             dispose();
             new LoginFrame();
@@ -85,7 +95,7 @@ public class StudentDashboard extends JFrame {
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBorder(new EmptyBorder(20, 10, 20, 10));
 
-        String[] menus = {"🏠 Home", "🗳️ Vote Now", "📋 Apply as Candidate", "✍️ Nominate", "📊 Results"};
+        String[] menus = {"🏠 Home", "📢 Announcements", "🗳️ Vote Now", "📊 Results"};
 
         for (String menu : menus) {
             JButton btn = new JButton(menu);
@@ -109,9 +119,8 @@ public class StudentDashboard extends JFrame {
         contentPanel.removeAll();
         switch (menu) {
             case "🏠 Home":             showHome(); break;
+            case "📢 Announcements":    showAnnouncementsBoard(); break;
             case "🗳️ Vote Now":         showVotePanel(); break;
-            case "📋 Apply as Candidate": showApplyPanel(); break;
-            case "✍️ Nominate":          showNominatePanel(); break;
             case "📊 Results":           showResultsPanel(); break;
         }
         contentPanel.revalidate();
@@ -123,42 +132,93 @@ public class StudentDashboard extends JFrame {
         panel.setBackground(Constants.COLOR_BG);
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0; gbc.gridy = 0;
+        gbc.gridx = 0;
         gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel welcome = new JLabel("<html><center>" +
             "<h2 style='color:#1a5276'>Welcome, " + student.getFullName() + "!</h2>" +
             "<p>Reg No: <b>" + student.getRegNumber() + "</b></p>" +
             "<p>Faculty: <b>" + student.getFacultyName() + "</b></p>" +
             "<p>Year: <b>" + student.getYearOfStudy() + "</b> | GPA: <b>" + student.getGpa() + "</b></p>" +
-            "<p>Verified: <b>" + (student.isVerified() ? "✅ Yes" : "❌ No") + "</b></p>" +
             "</center></html>");
         welcome.setFont(Constants.FONT_BODY);
         welcome.setHorizontalAlignment(JLabel.CENTER);
+
+        // Countdown Timer Panel for Active Elections
+        JPanel countdowns = new JPanel();
+        countdowns.setLayout(new BoxLayout(countdowns, BoxLayout.Y_AXIS));
+        countdowns.setBackground(Constants.COLOR_BG);
+        
+        List<Election> activeElections = electionService.getActiveElectionsForFaculty(student.getFacultyId());
+        for (Election e : activeElections) {
+            countdowns.add(createCountdownPanel(e));
+            countdowns.add(Box.createVerticalStrut(10));
+        }
 
         // Stats cards
         JPanel cards = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
         cards.setBackground(Constants.COLOR_BG);
         cards.add(makeStatCard("🗳️", "Vote Now", "Cast your faculty vote", Constants.COLOR_PRIMARY));
-        cards.add(makeStatCard("📋", "Apply", "Run for a position", Constants.COLOR_SUCCESS));
         cards.add(makeStatCard("📊", "Results", "View election results", Constants.COLOR_SECONDARY));
 
         gbc.gridy = 0; panel.add(welcome, gbc);
-        gbc.gridy = 1; panel.add(cards, gbc);
+        if (!activeElections.isEmpty()) {
+            gbc.gridy = 1; panel.add(countdowns, gbc);
+        }
+        gbc.gridy = 2; panel.add(cards, gbc);
 
-        contentPanel.add(panel, BorderLayout.CENTER);
+        contentPanel.add(new JScrollPane(panel), BorderLayout.CENTER);
+    }
+
+    private JPanel createCountdownPanel(Election election) {
+        JPanel p = new JPanel(new BorderLayout(10, 0));
+        p.setBackground(new Color(255, 245, 230));
+        p.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 165, 0), 1),
+            new EmptyBorder(10, 15, 10, 15)
+        ));
+
+        JLabel titleLbl = new JLabel("⏳ Live Election: " + election.getTitle());
+        titleLbl.setFont(Constants.FONT_BUTTON);
+        titleLbl.setForeground(new Color(150, 75, 0));
+
+        JLabel timerLbl = new JLabel("Loading timer...");
+        timerLbl.setFont(new Font("Monospaced", Font.BOLD, 14));
+        timerLbl.setForeground(Constants.COLOR_DANGER);
+
+        Timer timer = new Timer(1000, e -> {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime end = election.getEndDate().toLocalDateTime();
+            
+            if (now.isAfter(end)) {
+                timerLbl.setText("Voting has ended — View Results");
+                ((Timer)e.getSource()).stop();
+            } else {
+                Duration diff = Duration.between(now, end);
+                long h = diff.toHours();
+                long m = diff.toMinutesPart();
+                long s = diff.toSecondsPart();
+                timerLbl.setText(String.format("Voting closes in: %dh %dm %ds", h, m, s));
+            }
+        });
+        timer.start();
+
+        p.add(titleLbl, BorderLayout.WEST);
+        p.add(timerLbl, BorderLayout.EAST);
+        
+        // Ensure timer stops when panel is removed or dashboard closed
+        p.putClientProperty("timer", timer); 
+        
+        return p;
+    }
+
+    private void showAnnouncementsBoard() {
+        contentPanel.add(new AnnouncementsBoard(), BorderLayout.CENTER);
     }
 
     private void showVotePanel() {
         contentPanel.add(new VotePanel(student), BorderLayout.CENTER);
-    }
-
-    private void showApplyPanel() {
-        contentPanel.add(new CandidateApplicationPanel(student), BorderLayout.CENTER);
-    }
-
-    private void showNominatePanel() {
-        contentPanel.add(new NominatePanel(student), BorderLayout.CENTER);
     }
 
     private void showResultsPanel() {

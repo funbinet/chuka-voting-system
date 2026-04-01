@@ -1,0 +1,9 @@
+{
+  "java.project.sourcePaths": [
+    "ChukaVotingSystem/src"
+  ],
+  "java.project.outputPath": "out/vscode-bin",
+  "java.project.referencedLibraries": [
+    "ChukaVotingSystem/lib/**/*.jar"
+  ]
+}

@@ -8,5 +8,14 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="mysql-connector-j-9.6.0" level="project" />
+    <orderEntry type="library" name="guava-33.5.0-jre" level="project" />
+    <orderEntry type="library" name="fontbox-3.0.7" level="project" />
+    <orderEntry type="library" name="pdfbox-3.0.7" level="project" />
+    <orderEntry type="library" name="jcommon-1.0.19" level="project" />
+    <orderEntry type="library" name="gson-2.10" level="project" />
+    <orderEntry type="library" name="okhttp-3.14.9" level="project" />
+    <orderEntry type="library" name="okio-1.17.5" level="project" />
+    <orderEntry type="library" name="jfreechart-1.0.19" level="project" />
+    <orderEntry type="library" name="retrofit-2.9.0" level="project" />
   </component>
 </module>

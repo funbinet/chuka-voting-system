@@ -10,39 +10,36 @@ import java.awt.*;
 
 public class OTPDialog extends JDialog {
 
-    private Student     student;
-    private AuthService authService;
-    private boolean     verified = false;
-
+    private final Student student;
+    private final AuthService authService;
+    private boolean verified = false;
     private JTextField otpField;
-    private JLabel     statusLabel;
-    private JLabel     otpSimLabel; // Shows OTP in simulation mode
+    private JLabel statusLabel;
+    private JLabel deliveryLabel;
 
     public OTPDialog(JFrame parent, Student student, AuthService authService) {
         super(parent, "OTP Verification", true);
-        this.student     = student;
+        this.student = student;
         this.authService = authService;
         initUI();
     }
 
     private void initUI() {
-        setSize(400, 380);
+        setSize(420, 380);
         setLocationRelativeTo(getParent());
         setResizable(false);
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Constants.COLOR_BG);
 
-        // Header
         JPanel header = new JPanel();
         header.setBackground(Constants.COLOR_PRIMARY);
         header.setBorder(new EmptyBorder(15, 20, 15, 20));
-        JLabel title = new JLabel("📱 OTP Verification");
+        JLabel title = new JLabel("OTP Verification");
         title.setFont(Constants.FONT_HEADING);
         title.setForeground(Color.WHITE);
         header.add(title);
 
-        // Body
         JPanel body = new JPanel(new GridBagLayout());
         body.setBackground(Constants.COLOR_BG);
         body.setBorder(new EmptyBorder(20, 30, 20, 30));
@@ -52,27 +49,23 @@ public class OTPDialog extends JDialog {
         gbc.insets = new Insets(6, 0, 6, 0);
         gbc.gridx = 0;
 
-        // Info text
         gbc.gridy = 0;
-        String phone = maskPhone(student.getPhoneNumber());
-        JLabel infoLabel = new JLabel("<html><center>An OTP has been sent to<br><b>" + phone + "</b></center></html>");
+        JLabel infoLabel = new JLabel("<html><center>An OTP has been prepared for<br><b>" + maskPhone(student.getPhoneNumber()) + "</b></center></html>");
         infoLabel.setFont(Constants.FONT_BODY);
         infoLabel.setHorizontalAlignment(JLabel.CENTER);
         body.add(infoLabel, gbc);
 
-        // OTP simulation display
         gbc.gridy = 1;
-        gbc.insets = new Insets(10, 0, 10, 0);
-        otpSimLabel = new JLabel("(Simulation — OTP shown in console)");
-        otpSimLabel.setFont(Constants.FONT_SMALL);
-        otpSimLabel.setForeground(Constants.COLOR_ACCENT);
-        otpSimLabel.setHorizontalAlignment(JLabel.CENTER);
-        body.add(otpSimLabel, gbc);
+        deliveryLabel = new JLabel(authService.isOtpSimulationMode()
+                ? "SMS delivery is currently running in simulation mode for this build."
+                : "OTP delivery is being handled through the configured SMS gateway.");
+        deliveryLabel.setFont(Constants.FONT_SMALL);
+        deliveryLabel.setForeground(Constants.COLOR_ACCENT);
+        deliveryLabel.setHorizontalAlignment(JLabel.CENTER);
+        body.add(deliveryLabel, gbc);
 
-        // OTP input
         gbc.gridy = 2;
-        gbc.insets = new Insets(6, 0, 6, 0);
-        JLabel otpLabel = new JLabel("Enter 6-digit OTP:");
+        JLabel otpLabel = new JLabel("Enter the 6-digit OTP:");
         otpLabel.setFont(Constants.FONT_BODY);
         body.add(otpLabel, gbc);
 
@@ -83,7 +76,6 @@ public class OTPDialog extends JDialog {
         otpField.setPreferredSize(new Dimension(0, 50));
         body.add(otpField, gbc);
 
-        // Status label
         gbc.gridy = 4;
         statusLabel = new JLabel(" ");
         statusLabel.setFont(Constants.FONT_SMALL);
@@ -91,7 +83,6 @@ public class OTPDialog extends JDialog {
         statusLabel.setHorizontalAlignment(JLabel.CENTER);
         body.add(statusLabel, gbc);
 
-        // Buttons
         gbc.gridy = 5;
         gbc.insets = new Insets(12, 0, 6, 0);
         JButton verifyBtn = new JButton("VERIFY OTP");
@@ -113,26 +104,30 @@ public class OTPDialog extends JDialog {
 
     private void handleVerify() {
         String otp = otpField.getText().trim();
-        if (otp.length() != 6) {
-            statusLabel.setText("❌ OTP must be 6 digits.");
+        if (!otp.matches("\\d{" + Constants.OTP_LENGTH + "}")) {
+            statusLabel.setText("Please enter a valid 6-digit OTP.");
             return;
         }
 
-        boolean result = authService.verifyStudentOTP(student, otp);
-        if (result) {
+        if (authService.verifyStudentOTP(student, otp)) {
             verified = true;
-            JOptionPane.showMessageDialog(this, "✅ Verified! Welcome, " + student.getFullName());
+            JOptionPane.showMessageDialog(this, "Verification completed successfully.", "OTP Verified", JOptionPane.INFORMATION_MESSAGE);
             dispose();
-        } else {
-            statusLabel.setText("❌ Invalid or expired OTP. Try again.");
-            otpField.setText("");
+            return;
         }
+
+        statusLabel.setText(authService.getLastMessage());
+        otpField.setText("");
     }
 
     private void handleResend() {
-        authService.sendOTPToStudent(student);
-        statusLabel.setForeground(Constants.COLOR_SUCCESS);
-        statusLabel.setText("✅ New OTP sent. Check console/SMS.");
+        if (authService.sendOTPToStudent(student)) {
+            statusLabel.setForeground(Constants.COLOR_SUCCESS);
+            statusLabel.setText("A new OTP has been generated.");
+        } else {
+            statusLabel.setForeground(Constants.COLOR_DANGER);
+            statusLabel.setText(authService.getLastMessage());
+        }
         otpField.setText("");
     }
 
@@ -147,9 +142,13 @@ public class OTPDialog extends JDialog {
     }
 
     private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 6) return phone;
+        if (phone == null || phone.length() < 6) {
+            return phone;
+        }
         return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
     }
 
-    public boolean isVerified() { return verified; }
+    public boolean isVerified() {
+        return verified;
+    }
 }

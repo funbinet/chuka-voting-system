@@ -11,18 +11,26 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 public class ManageElectionsPanel extends JPanel {
 
-    private Admin           admin;
-    private ElectionService electionService;
-    private JTable          table;
+    private final Admin admin;
+    private final ElectionService electionService;
+    private JTable table;
     private DefaultTableModel tableModel;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ManageElectionsPanel(Admin admin) {
-        this.admin           = admin;
+        this.admin = admin;
         this.electionService = new ElectionService();
         setBackground(Constants.COLOR_BG);
         setLayout(new BorderLayout());
@@ -31,16 +39,15 @@ public class ManageElectionsPanel extends JPanel {
     }
 
     private void buildUI() {
-        // Top bar
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(Constants.COLOR_BG);
         topBar.setBorder(new EmptyBorder(0, 0, 10, 0));
 
-        JLabel heading = new JLabel("🗳️ Manage Elections");
+        JLabel heading = new JLabel("Manage Elections");
         heading.setFont(Constants.FONT_HEADING);
         heading.setForeground(Constants.COLOR_PRIMARY);
 
-        JButton createBtn = new JButton("+ Create Election");
+        JButton createBtn = new JButton("Create Election");
         createBtn.setFont(Constants.FONT_BUTTON);
         createBtn.setBackground(Constants.COLOR_SUCCESS);
         createBtn.setForeground(Color.WHITE);
@@ -51,10 +58,12 @@ public class ManageElectionsPanel extends JPanel {
         topBar.add(heading, BorderLayout.WEST);
         topBar.add(createBtn, BorderLayout.EAST);
 
-        // Table
-        String[] cols = {"ID", "Title", "Faculty", "Start Date", "End Date", "Status", "Actions"};
+        String[] cols = {"ID", "Title", "Faculty", "Start Date", "End Date", "Status"};
         tableModel = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return c == 6; }
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
         };
 
         table = new JTable(tableModel);
@@ -65,19 +74,21 @@ public class ManageElectionsPanel extends JPanel {
         table.getTableHeader().setForeground(Color.WHITE);
 
         loadElections();
-
         add(topBar, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
     }
 
     private void loadElections() {
         tableModel.setRowCount(0);
-        electionService.syncElectionStatuses();
         List<Election> elections = electionService.getAllElections();
-        for (Election e : elections) {
+        for (Election election : elections) {
             tableModel.addRow(new Object[]{
-                e.getElectionId(), e.getTitle(), e.getFacultyName(),
-                e.getStartDate(), e.getEndDate(), e.getStatus(), "Manage"
+                    election.getElectionId(),
+                    election.getTitle(),
+                    election.getFacultyName(),
+                    election.getStartDate(),
+                    election.getEndDate(),
+                    election.getStatus()
             });
         }
     }
@@ -104,22 +115,33 @@ public class ManageElectionsPanel extends JPanel {
         facultyCombo.setFont(Constants.FONT_BODY);
         loadFacultiesIntoCombo(facultyCombo);
 
-        JTextField startField = new JTextField("2024-12-01 08:00:00");
+        LocalDateTime tomorrow = LocalDateTime.now().plusDays(1).withHour(8).withMinute(0).withSecond(0);
+        LocalDateTime dayAfter = tomorrow.plusDays(1).withHour(18).withMinute(0).withSecond(0);
+
+        JTextField startField = new JTextField(tomorrow.format(DATE_FORMATTER));
         startField.setFont(Constants.FONT_BODY);
         startField.setPreferredSize(new Dimension(0, 38));
 
-        JTextField endField = new JTextField("2024-12-02 20:00:00");
+        JTextField endField = new JTextField(dayAfter.format(DATE_FORMATTER));
         endField.setFont(Constants.FONT_BODY);
         endField.setPreferredSize(new Dimension(0, 38));
 
-        gbc.gridy = 0; panel.add(makeLabel("Election Title:"), gbc);
-        gbc.gridy = 1; panel.add(titleField, gbc);
-        gbc.gridy = 2; panel.add(makeLabel("Faculty:"), gbc);
-        gbc.gridy = 3; panel.add(facultyCombo, gbc);
-        gbc.gridy = 4; panel.add(makeLabel("Start Date (YYYY-MM-DD HH:MM:SS):"), gbc);
-        gbc.gridy = 5; panel.add(startField, gbc);
-        gbc.gridy = 6; panel.add(makeLabel("End Date (YYYY-MM-DD HH:MM:SS):"), gbc);
-        gbc.gridy = 7; panel.add(endField, gbc);
+        gbc.gridy = 0;
+        panel.add(makeLabel("Election Title:"), gbc);
+        gbc.gridy = 1;
+        panel.add(titleField, gbc);
+        gbc.gridy = 2;
+        panel.add(makeLabel("Faculty:"), gbc);
+        gbc.gridy = 3;
+        panel.add(facultyCombo, gbc);
+        gbc.gridy = 4;
+        panel.add(makeLabel("Start Date (yyyy-MM-dd HH:mm:ss):"), gbc);
+        gbc.gridy = 5;
+        panel.add(startField, gbc);
+        gbc.gridy = 6;
+        panel.add(makeLabel("End Date (yyyy-MM-dd HH:mm:ss):"), gbc);
+        gbc.gridy = 7;
+        panel.add(endField, gbc);
 
         gbc.gridy = 8;
         gbc.insets = new Insets(15, 0, 0, 0);
@@ -132,15 +154,34 @@ public class ManageElectionsPanel extends JPanel {
         createBtn.setPreferredSize(new Dimension(0, 42));
         createBtn.addActionListener(e -> {
             Faculty faculty = (Faculty) facultyCombo.getSelectedItem();
+            if (faculty == null) {
+                JOptionPane.showMessageDialog(dialog, "Please select a faculty.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            Timestamp startDate;
+            Timestamp endDate;
+            try {
+                startDate = Timestamp.valueOf(LocalDateTime.parse(startField.getText().trim(), DATE_FORMATTER));
+                endDate = Timestamp.valueOf(LocalDateTime.parse(endField.getText().trim(), DATE_FORMATTER));
+            } catch (DateTimeParseException ex) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Please enter dates using the format yyyy-MM-dd HH:mm:ss.",
+                        "Invalid Date Format", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             String result = electionService.createElection(
-                titleField.getText().trim(),
-                faculty.getFacultyId(),
-                Timestamp.valueOf(startField.getText().trim()),
-                Timestamp.valueOf(endField.getText().trim()),
-                admin.getAdminId()
+                    titleField.getText().trim(),
+                    faculty.getFacultyId(),
+                    startDate,
+                    endDate,
+                    admin.getAdminId()
             );
-            JOptionPane.showMessageDialog(dialog, result);
-            if (result.startsWith("✅")) {
+            JOptionPane.showMessageDialog(dialog, result,
+                    result.toLowerCase().contains("successfully") ? "Election Created" : "Election Error",
+                    result.toLowerCase().contains("successfully") ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
+            if (result.toLowerCase().contains("successfully")) {
                 loadElections();
                 dialog.dispose();
             }
@@ -154,12 +195,13 @@ public class ManageElectionsPanel extends JPanel {
     private void loadFacultiesIntoCombo(JComboBox<Faculty> combo) {
         try {
             Connection conn = DBConnection.getInstance().getConnection();
-            ResultSet rs = conn.prepareStatement("SELECT * FROM faculties").executeQuery();
+            PreparedStatement ps = conn.prepareStatement("SELECT * FROM faculties ORDER BY faculty_name");
+            ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 combo.addItem(new Faculty(
-                    rs.getInt("faculty_id"),
-                    rs.getString("faculty_code"),
-                    rs.getString("faculty_name")
+                        rs.getInt("faculty_id"),
+                        rs.getString("faculty_code"),
+                        rs.getString("faculty_name")
                 ));
             }
         } catch (SQLException e) {
@@ -168,8 +210,8 @@ public class ManageElectionsPanel extends JPanel {
     }
 
     private JLabel makeLabel(String text) {
-        JLabel l = new JLabel(text);
-        l.setFont(Constants.FONT_SMALL);
-        return l;
+        JLabel label = new JLabel(text);
+        label.setFont(Constants.FONT_SMALL);
+        return label;
     }
 }

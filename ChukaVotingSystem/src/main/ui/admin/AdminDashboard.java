@@ -46,14 +46,14 @@ public class AdminDashboard extends JFrame {
         topBar.setBackground(new Color(15, 52, 96));
         topBar.setBorder(new EmptyBorder(12, 20, 12, 20));
 
-        JLabel title = new JLabel("🎓 " + Constants.APP_NAME + " — ADMIN PANEL");
+        JLabel title = new JLabel("\uD83C\uDF13 " + Constants.APP_NAME + " — ADMIN PANEL");
         title.setFont(Constants.FONT_HEADING);
         title.setForeground(Color.WHITE);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         right.setBackground(new Color(15, 52, 96));
 
-        JLabel adminLabel = new JLabel("🔑 " + admin.getFullName());
+        JLabel adminLabel = new JLabel("\uD83D\uDD11 " + admin.getFullName());
         adminLabel.setFont(Constants.FONT_SMALL);
         adminLabel.setForeground(Constants.COLOR_ACCENT);
 
@@ -83,7 +83,8 @@ public class AdminDashboard extends JFrame {
         String[] menus = {
             "🏠  Dashboard",
             "🗳️  Manage Elections",
-            "📋  Review Applications",
+            "👥  Manage Candidates",
+            "📢  Announcements",
             "📊  View Results",
             "👥  Manage Students"
         };
@@ -110,7 +111,8 @@ public class AdminDashboard extends JFrame {
         contentPanel.removeAll();
         if (menu.contains("Dashboard"))           showHome();
         else if (menu.contains("Elections"))      contentPanel.add(new ManageElectionsPanel(admin), BorderLayout.CENTER);
-        else if (menu.contains("Applications"))   contentPanel.add(new ReviewApplicationsPanel(admin), BorderLayout.CENTER);
+        else if (menu.contains("Candidates"))     contentPanel.add(new ReviewApplicationsPanel(admin), BorderLayout.CENTER);
+        else if (menu.contains("Announcements"))  contentPanel.add(new ManageAnnouncementsPanel(admin), BorderLayout.CENTER);
         else if (menu.contains("Results"))        contentPanel.add(new AdminResultsPanel(), BorderLayout.CENTER);
         else if (menu.contains("Students"))       contentPanel.add(new ManageStudentsPanel(), BorderLayout.CENTER);
         contentPanel.revalidate();
@@ -133,7 +135,7 @@ public class AdminDashboard extends JFrame {
         JPanel cards = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
         cards.setBackground(Constants.COLOR_BG);
         cards.add(makeCard("🗳️", "Elections", "Create & manage elections", Constants.COLOR_PRIMARY));
-        cards.add(makeCard("📋", "Applications", "Review candidate applications", Constants.COLOR_ACCENT));
+        cards.add(makeCard("👥", "Candidates", "Add & manage candidates", Constants.COLOR_ACCENT));
         cards.add(makeCard("📊", "Results", "View live vote counts", Constants.COLOR_SUCCESS));
         cards.add(makeCard("👥", "Students", "Manage student records", Constants.COLOR_SECONDARY));
 
