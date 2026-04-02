@@ -50,16 +50,17 @@ We've simplified the setup process into a single script for both Linux and Windo
    ./run.sh
    ```
 
-**For Windows:**
+**For Windows (PowerShell/CMD):**
 1. **Clone & Navigate**:
-   ```cmd
+   ```powershell
    git clone https://github.com/funbinet/chuka-voting-system.git
    cd chuka-voting-system
    ```
 2. **Run**:
-   ```cmd
-   run.bat
+   ```powershell
+   .\run.bat
    ```
+   *(Note: The `.\` is required in PowerShell to run local scripts.)*
 
 *The script will automatically:*
 - Detect and attempt to install Java (OpenJDK 17) if missing.
