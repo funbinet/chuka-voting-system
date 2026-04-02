@@ -13,11 +13,13 @@ public class ElectionService {
 
     private final ElectionDAO electionDAO;
     private final CandidateDAO candidateDAO;
+    private final main.dao.FacultyDAO facultyDAO;
     private final AuditService auditService;
 
     public ElectionService() {
         this.electionDAO = new ElectionDAO();
         this.candidateDAO = new CandidateDAO();
+        this.facultyDAO = new main.dao.FacultyDAO();
         this.auditService = AuditService.getInstance();
     }
 
@@ -178,5 +180,63 @@ public class ElectionService {
             return "Election deleted successfully.";
         }
         return "Failed to delete the election (database error).";
+    }
+
+    public String validateAllPositionsFilled() {
+        List<main.models.Faculty> faculties = facultyDAO.getAllFaculties();
+        int[] facultyPositions = {101, 102, 103};
+        int[] generalPositions = {104, 105, 106, 107};
+
+        for (main.models.Faculty f : faculties) {
+            for (int pId : facultyPositions) {
+                if (candidateDAO.countApprovedCandidatesForBind(f.getFacultyId(), pId) == 0) {
+                    return "Incomplete: " + getPosName(pId) + " for " + f.getFacultyName() + " has no approved candidates.";
+                }
+            }
+        }
+
+        for (int pId : generalPositions) {
+            if (candidateDAO.countApprovedCandidatesForBind(null, pId) == 0) {
+                return "Incomplete: " + getPosName(pId) + " (University-wide) has no approved candidates.";
+            }
+        }
+
+        return null; // All positions filled
+    }
+
+    public int createAllStandardElections(Timestamp start, Timestamp end, int adminId) {
+        List<main.models.Faculty> faculties = facultyDAO.getAllFaculties();
+        int[] facultyPositions = {101, 102, 103};
+        int[] generalPositions = {104, 105, 106, 107};
+        int createdCount = 0;
+
+        for (main.models.Faculty f : faculties) {
+            for (int pId : facultyPositions) {
+                String title = f.getFacultyCode() + " " + getPosName(pId) + " Election 2026/27";
+                String res = createElection(title, f.getFacultyId(), pId, start, end, adminId);
+                if (res.contains("successfully")) createdCount++;
+            }
+        }
+
+        for (int pId : generalPositions) {
+            String title = getPosName(pId) + " University Election 2026/27";
+            String res = createElection(title, null, pId, start, end, adminId);
+            if (res.contains("successfully")) createdCount++;
+        }
+
+        return createdCount;
+    }
+
+    private String getPosName(int id) {
+        switch(id) {
+            case 101: return "Faculty Chairman";
+            case 102: return "Faculty Secretary";
+            case 103: return "Faculty Treasurer";
+            case 104: return "Female Resident";
+            case 105: return "Male Resident";
+            case 106: return "Female Non-Resident";
+            case 107: return "Male Non-Resident";
+            default: return "Unknown Position";
+        }
     }
 }

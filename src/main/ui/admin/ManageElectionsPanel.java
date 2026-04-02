@@ -55,6 +55,14 @@ public class ManageElectionsPanel extends JPanel {
         createBtn.setBorderPainted(false);
         createBtn.addActionListener(e -> showCreateDialog());
 
+        JButton bulkCreateBtn = new JButton("🚀 Add All Elections");
+        bulkCreateBtn.setFont(Constants.FONT_BUTTON);
+        bulkCreateBtn.setBackground(Constants.COLOR_PRIMARY);
+        bulkCreateBtn.setForeground(Color.WHITE);
+        bulkCreateBtn.setFocusPainted(false);
+        bulkCreateBtn.setBorderPainted(false);
+        bulkCreateBtn.addActionListener(e -> showBulkCreateDialog());
+
         JButton editBtn = new JButton("Edit");
         editBtn.setFont(Constants.FONT_BUTTON);
         editBtn.setBackground(Constants.COLOR_SECONDARY);
@@ -98,6 +106,7 @@ public class ManageElectionsPanel extends JPanel {
         btnPanel.add(editBtn);
         btnPanel.add(deleteBtn);
         btnPanel.add(createBtn);
+        btnPanel.add(bulkCreateBtn);
 
         topBar.add(heading, BorderLayout.WEST);
         topBar.add(btnPanel, BorderLayout.EAST);
@@ -246,6 +255,88 @@ public class ManageElectionsPanel extends JPanel {
             
             JOptionPane.showMessageDialog(dialog, result);
             if (result.toLowerCase().contains("successfully")) {
+                loadElections();
+                dialog.dispose();
+            }
+        });
+        panel.add(createBtn, gbc);
+
+        dialog.add(panel);
+        dialog.setVisible(true);
+    }
+
+    private void showBulkCreateDialog() {
+        String validationError = electionService.validateAllPositionsFilled();
+        if (validationError != null) {
+            JOptionPane.showMessageDialog(this, 
+                "Bulk creation blocked:\n" + validationError + "\n\nPlease ensure every position has at least one approved candidate first.", 
+                "Action Blocked", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Bulk Create All Standard Elections", true);
+        dialog.setSize(450, 400);
+        dialog.setLocationRelativeTo(this);
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Constants.COLOR_BG);
+        panel.setBorder(new EmptyBorder(20, 30, 20, 30));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.insets = new Insets(10, 0, 10, 0);
+
+        JLabel infoLabel = new JLabel("<html><b>Ready to create all 19 standard elections.</b><br>Please set the universal start and end date:</html>");
+        infoLabel.setFont(Constants.FONT_BODY);
+
+        LocalDateTime tomorrow = LocalDateTime.now().plusDays(1).withHour(8).withMinute(0).withSecond(0);
+        LocalDateTime dayAfter = tomorrow.plusDays(2).withHour(18).withMinute(0).withSecond(0);
+
+        JTextField startField = new JTextField(tomorrow.format(DATE_FORMATTER));
+        startField.setFont(Constants.FONT_BODY);
+        startField.setPreferredSize(new Dimension(0, 38));
+
+        JTextField endField = new JTextField(dayAfter.format(DATE_FORMATTER));
+        endField.setFont(Constants.FONT_BODY);
+        endField.setPreferredSize(new Dimension(0, 38));
+
+        gbc.gridy = 0; panel.add(infoLabel, gbc);
+        gbc.gridy = 1; panel.add(makeLabel("Universal Start Date:"), gbc);
+        gbc.gridy = 2; panel.add(startField, gbc);
+        gbc.gridy = 3; panel.add(makeLabel("Universal End Date:"), gbc);
+        gbc.gridy = 4; panel.add(endField, gbc);
+
+        gbc.gridy = 5;
+        gbc.insets = new Insets(20, 0, 0, 0);
+        JButton createBtn = new JButton("INITIATE BULK CREATION (19 ELECTIONS)");
+        createBtn.setFont(Constants.FONT_BUTTON);
+        createBtn.setBackground(Constants.COLOR_SUCCESS);
+        createBtn.setForeground(Color.WHITE);
+        createBtn.setPreferredSize(new Dimension(0, 45));
+        createBtn.addActionListener(e -> {
+            Timestamp startDate;
+            Timestamp endDate;
+            try {
+                startDate = Timestamp.valueOf(LocalDateTime.parse(startField.getText().trim(), DATE_FORMATTER));
+                endDate = Timestamp.valueOf(LocalDateTime.parse(endField.getText().trim(), DATE_FORMATTER));
+            } catch (DateTimeParseException ex) {
+                JOptionPane.showMessageDialog(dialog, "Invalid date format.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (!endDate.after(startDate)) {
+                JOptionPane.showMessageDialog(dialog, "End date must be after start date.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(dialog, 
+                "This will generate 19 elections spanning all faculties and generic roles.\nProceed?", 
+                "Confirm Bulk Action", JOptionPane.YES_NO_OPTION);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                int count = electionService.createAllStandardElections(startDate, endDate, admin.getAdminId());
+                JOptionPane.showMessageDialog(dialog, "Successfully created " + count + " elections.");
                 loadElections();
                 dialog.dispose();
             }
