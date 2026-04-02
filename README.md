@@ -65,7 +65,6 @@ We've simplified the setup process into a single script for both Linux and Windo
      ```powershell
      .\run.bat
      ```
-   *(Note: The `.\` is required in PowerShell for security, whereas CMD accepts just the filename.)*
 
 *The script will automatically:*
 - Detect and attempt to install Java (OpenJDK 17) if missing.
