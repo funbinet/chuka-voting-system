@@ -1,7 +1,6 @@
 services:
   db:
     image: mysql:8.0
-    container_name: chuka_voting_db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: chuka_root_2024
