@@ -1,0 +1,23 @@
+# Compiled output
+out/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.qodo/
+.dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker data
+docker/mysql_data/
+
+# Temporary files
+*.class
+*.log
+/tmp/
+chuka_sources.txt
+sources.txt

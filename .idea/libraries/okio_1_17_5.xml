@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="okio-1.17.5">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/ChukaVotingSystem/lib/okio-1.17.5.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
