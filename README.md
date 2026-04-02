@@ -62,14 +62,20 @@ We've simplified the setup process into a single script for both Linux and Windo
    ```
 
 *The script will automatically:*
-- Check for Java and Docker dependencies.
+- Detect and attempt to install Java (OpenJDK 17) if missing.
+- Check for Docker and provide setup links/auto-install.
+- Verify Port 3308 availability.
 - Spin up the MySQL database using Docker Compose.
-- Compile the Java source files.
-- Launch the application.
+- Compile the Java source files and launch the application.
 
 ---
 
-## Project Structure
+## Troubleshooting & Guided Setup
+
+If the automated setup fails:
+- **Linux/Ubuntu**: `sudo apt update && sudo apt install openjdk-17-jdk docker.io docker-compose`
+- **macOS**: `brew install openjdk@17 docker`
+- **Windows**: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and run `winget install Microsoft.OpenJDK.17`.
 
 ```text
 .
