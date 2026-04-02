@@ -57,10 +57,15 @@ We've simplified the setup process into a single script for both Linux and Windo
    cd chuka-voting-system
    ```
 2. **Run**:
-   ```powershell
-   .\run.bat
-   ```
-   *(Note: The `.\` is required in PowerShell to run local scripts.)*
+   - **Command Prompt (CMD)**:
+     ```cmd
+     run.bat
+     ```
+   - **PowerShell**:
+     ```powershell
+     .\run.bat
+     ```
+   *(Note: The `.\` is required in PowerShell for security, whereas CMD accepts just the filename.)*
 
 *The script will automatically:*
 - Detect and attempt to install Java (OpenJDK 17) if missing.
