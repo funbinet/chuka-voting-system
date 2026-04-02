@@ -73,16 +73,17 @@ We've simplified the setup process into a single script for both Linux and Windo
 
 ```text
 .
-â”œâ”€â”€ src/                  # Java source code
-â”‚   â”œâ”€â”€ main/
-â”‚   â”‚   â”œâ”€â”€ dao/          # Data Access Objects (DB logic)
-â”‚   â”‚   â”œâ”€â”€ services/     # Business logic layer
-â”‚   â”‚   â”œâ”€â”€ models/       # Data entities
-â”‚   â”‚   â””â”€â”€ ui/           # GUI Components (Admin/Student)
-â”œâ”€â”€ resources/            # SQL scripts and assets
-â”œâ”€â”€ lib/                  # External dependencies (.jar)
-â”œâ”€â”€ docker-compose.yml    # Database orchestration
-â””â”€â”€ run.sh                # Main entry point script
+chuka-voting-system/
+├── src/                  # Java source code
+│   ├── main/
+│   │   ├── dao/          # Data Access Objects (database logic)
+│   │   ├── services/     # Business logic layer
+│   │   ├── models/       # Data entities
+│   │   └── ui/           # GUI components (Admin / Student)
+├── resources/            # SQL scripts and static assets
+├── lib/                  # External dependencies (.jar files)
+├── docker-compose.yml    # Docker orchestration for database and services
+└── run.sh                # Main entry point script
 ```
 
 ---
