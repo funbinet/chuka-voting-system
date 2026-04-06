@@ -30,15 +30,20 @@ The CUVS is built with a focus on **modular architecture** and **database resili
 
 ### Prerequisites
 
-- **Linux** (Recommended): Ubuntu/Debian preferred.
-- **Java JDK 17** or higher.
-- **Docker** and **Docker Compose**.
+- **Linux** (Recommended): Docker and Docker Compose installed.
+- **Windows**: 
+  - **Java JDK 17+** installed.
+  - **MySQL Server** installed and running.
+  - **MySQL Workbench** or similar tool for schema management.
 
-### Installation & Run
+---
 
-We've simplified the setup process into a single script for both Linux and Windows.
+## Installation & Run
 
-**For Linux/Mac:**
+### 🐧 For Linux (Automated via Docker)
+
+The setup process for Linux is fully automated using Docker.
+
 1. **Clone & Navigate**:
    ```bash
    git clone https://github.com/funbinet/chuka-voting-system.git
@@ -50,66 +55,62 @@ We've simplified the setup process into a single script for both Linux and Windo
    ./run.sh
    ```
 
-**For Windows (PowerShell/CMD):**
-1. **Clone & Navigate**:
-   ```powershell
-   git clone https://github.com/funbinet/chuka-voting-system.git
-   cd chuka-voting-system
-   ```
-2. **Run**:
-   - **Command Prompt (CMD)**:
-     ```cmd
-     run.bat
-     ```
-   - **PowerShell**:
-     ```powershell
-     .\run.bat
-     ```
-
 *The script will automatically:*
-- Detect and attempt to install Java (OpenJDK 17) if missing.
-- Check for Docker and provide setup links/auto-install.
-- Verify Port 3308 availability.
 - Spin up the MySQL database using Docker Compose.
 - Compile the Java source files and launch the application.
 
 ---
 
-## Troubleshooting & Guided Setup
+### 🪟 For Windows (Manual Configuration)
 
-If the automated setup fails:
-- **Linux/Ubuntu**: `sudo apt update && sudo apt install openjdk-17-jdk docker.io docker-compose`
-- **macOS**: `brew install openjdk@17 docker`
-- **Windows**: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and run `winget install Microsoft.OpenJDK.17`.
+Windows users should follow these manual steps to set up the environment:
 
-```text
-.
-chuka-voting-system/
-├── src/                  # Java source code
-│   ├── main/
-│   │   ├── dao/          # Data Access Objects (database logic)
-│   │   ├── services/     # Business logic layer
-│   │   ├── models/       # Data entities
-│   │   └── ui/           # GUI components (Admin / Student)
-├── resources/            # SQL scripts and static assets
-├── lib/                  # External dependencies (.jar files)
-├── docker-compose.yml    # Docker orchestration for database and services
-└── run.sh                # Main entry point script
-```
+#### 1. Prepare the Database
+- Open **MySQL Workbench** or your preferred MySQL client.
+- Open and run the SQL schema script located at: `resources/db/schema.sql`.
+- This will create the `chuka_voting_db` and all necessary tables.
+
+#### 2. Configure the Application
+- Navigate to the `resources/` folder.
+- Open `config.properties` in a text editor.
+- Update the following fields to match your local MySQL credentials:
+  ```properties
+  db.host=localhost
+  db.port=3306
+  db.name=chuka_voting_db
+  db.user=root
+  db.password=your_password_here
+  ```
+
+#### 3. Run the Application
+You can run the application using your IDE (like IntelliJ or Eclipse) or via the command line:
+
+- **Using Command Line**:
+  1. Open PowerShell or CMD in the project root.
+  2. Compile the project (ensure `javac` is in your PATH):
+     ```powershell
+     mkdir out
+     dir /s /b src\*.java > sources.txt
+     javac -cp "lib/*" -d out @sources.txt
+     del sources.txt
+     xcopy /e /i /y resources out
+     ```
+  3. Launch the application:
+     ```powershell
+     java -cp "out;lib/*" main.Main
+     ```
 
 ---
 
 ## Configuration
 
-Default database settings are managed via environment variables in `run.sh`:
+The application uses a multi-layered configuration approach managed in `src/main/utils/DBConfig.java`:
 
-- **Host**: `localhost`
-- **Port**: `3308`
-- **DB Name**: `chuka_voting_db`
-- **User**: `root`
-- **Password**: `chuka_root_2024`
+1.  **Environment Variables**: Highest priority (used by Docker on Linux).
+2.  **config.properties**: Used for manual setup (Primary method for Windows).
+3.  **Default Values**: Fallback credentials.
 
-To use an external database, modify the `DB_*` exports in the `run_app` function of `run.sh`.
+**Config File Location**: `resources/config.properties`
 
 ---
 
