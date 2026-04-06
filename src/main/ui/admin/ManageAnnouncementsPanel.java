@@ -85,7 +85,7 @@ public class ManageAnnouncementsPanel extends JPanel {
         actionBar.add(deleteBtn);
         actionBar.add(clearAllBtn);
 
-        String[] cols = {"ID", "Title", "Posted By", "Date"};
+        String[] cols = {"No.", "ID", "Title", "Posted By", "Date"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -96,6 +96,7 @@ public class ManageAnnouncementsPanel extends JPanel {
         table.getTableHeader().setFont(Constants.FONT_BUTTON);
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
+        hideInternalIdColumn();
 
         add(topPanel, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
@@ -111,6 +112,7 @@ public class ManageAnnouncementsPanel extends JPanel {
         List<Announcement> list = announcementDAO.getAll();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         String term = search == null ? "" : search.trim().toLowerCase();
+        int displayNo = 1;
         for (Announcement a : list) {
             if (!term.isEmpty()) {
                 String title = a.getTitle() == null ? "" : a.getTitle().toLowerCase();
@@ -122,6 +124,7 @@ public class ManageAnnouncementsPanel extends JPanel {
             }
 
             tableModel.addRow(new Object[]{
+                displayNo++,
                 a.getId(),
                 a.getTitle(),
                 a.getAdminName(),
@@ -160,8 +163,9 @@ public class ManageAnnouncementsPanel extends JPanel {
             return;
         }
 
-        int id = (int) tableModel.getValueAt(row, 0);
-        String title = String.valueOf(tableModel.getValueAt(row, 1));
+        int modelRow = table.convertRowIndexToModel(row);
+        int id = (int) tableModel.getValueAt(modelRow, 1);
+        String title = String.valueOf(tableModel.getValueAt(modelRow, 2));
         int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "Delete announcement '" + title + "'?",
@@ -203,5 +207,11 @@ public class ManageAnnouncementsPanel extends JPanel {
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         return btn;
+    }
+
+    private void hideInternalIdColumn() {
+        table.getColumnModel().getColumn(1).setMinWidth(0);
+        table.getColumnModel().getColumn(1).setMaxWidth(0);
+        table.getColumnModel().getColumn(1).setPreferredWidth(0);
     }
 }

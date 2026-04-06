@@ -25,6 +25,10 @@ import java.util.Map;
 
 public class ReviewApplicationsPanel extends JPanel {
 
+    private static final int COL_ID = 1;
+    private static final int COL_NAME = 2;
+    private static final int COL_ACTION = 8;
+
     private final Admin admin;
     private final CandidateService candidateService;
     private final CandidateDAO candidateDAO;
@@ -93,11 +97,11 @@ public class ReviewApplicationsPanel extends JPanel {
         topBar.add(Box.createVerticalStrut(8));
         topBar.add(searchRow);
 
-        String[] cols = {"ID", "Name", "Reg Number", "Faculty", "Position", "Coalition", "Status", "Action"};
+        String[] cols = {"No.", "ID", "Name", "Reg Number", "Faculty", "Position", "Coalition", "Status", "Action"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 7; // Only the action column is interactive
+                return column == COL_ACTION; // Only the action column is interactive
             }
         };
 
@@ -108,6 +112,7 @@ public class ReviewApplicationsPanel extends JPanel {
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        hideInternalIdColumn();
 
         JButton addBtn = new JButton("➕ Add Candidate");
         addBtn.setFont(Constants.FONT_BUTTON);
@@ -170,12 +175,13 @@ public class ReviewApplicationsPanel extends JPanel {
     private void loadCandidates(String search) {
         tableModel.setRowCount(0);
         String s = search.toLowerCase();
+        int displayNo = 1;
 
         List<Candidate> pending = candidateService.getPendingApplications();
         for (Candidate c : pending) {
             if (s.isEmpty() || c.getStudentName().toLowerCase().contains(s) || c.getRegNumber().toLowerCase().contains(s)) {
                 tableModel.addRow(new Object[]{
-                        c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
+                        displayNo++, c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
                         c.getFacultyName(), c.getPositionName(), c.getCoalitionName(), c.getStatus(), "APPROVE"
                 });
             }
@@ -185,7 +191,7 @@ public class ReviewApplicationsPanel extends JPanel {
         for (Candidate c : approved) {
             if (s.isEmpty() || c.getStudentName().toLowerCase().contains(s) || c.getRegNumber().toLowerCase().contains(s)) {
                 tableModel.addRow(new Object[]{
-                        c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
+                        displayNo++, c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
                         c.getFacultyName(), c.getPositionName(), c.getCoalitionName(), c.getStatus(), "REMOVE"
                 });
             }
@@ -201,7 +207,8 @@ public class ReviewApplicationsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select a candidate first.", "Selection Required", JOptionPane.WARNING_MESSAGE);
             return null;
         }
-        return (int) tableModel.getValueAt(row, 0);
+        int modelRow = table.convertRowIndexToModel(row);
+        return (int) tableModel.getValueAt(modelRow, COL_ID);
     }
 
     private void removeSelectedCandidate() {
@@ -211,7 +218,8 @@ public class ReviewApplicationsPanel extends JPanel {
         }
 
         int row = table.getSelectedRow();
-        String name = String.valueOf(tableModel.getValueAt(row, 1));
+        int modelRow = table.convertRowIndexToModel(row);
+        String name = String.valueOf(tableModel.getValueAt(modelRow, COL_NAME));
         int confirm = JOptionPane.showConfirmDialog(
                 this,
                 "Delete candidate '" + name + "' from candidacy?",
@@ -595,6 +603,12 @@ public class ReviewApplicationsPanel extends JPanel {
         return label;
     }
 
+    private void hideInternalIdColumn() {
+        table.getColumnModel().getColumn(COL_ID).setMinWidth(0);
+        table.getColumnModel().getColumn(COL_ID).setMaxWidth(0);
+        table.getColumnModel().getColumn(COL_ID).setPreferredWidth(0);
+    }
+
     // Action button handlers
     class ButtonRenderer extends JButton implements javax.swing.table.TableCellRenderer {
         public ButtonRenderer() {
@@ -641,8 +655,9 @@ public class ReviewApplicationsPanel extends JPanel {
 
         public Object getCellEditorValue() {
             if (isPushed) {
-                int appId = (int) tableModel.getValueAt(row, 0);
-                String name = (String) tableModel.getValueAt(row, 1);
+                int modelRow = table.convertRowIndexToModel(row);
+                int appId = (int) tableModel.getValueAt(modelRow, COL_ID);
+                String name = String.valueOf(tableModel.getValueAt(modelRow, COL_NAME));
                 
                 if (label.equals("APPROVE")) {
                     int confirm = JOptionPane.showConfirmDialog(button, "Approve " + name + " for candidacy?", "Approve Candidate", JOptionPane.YES_NO_OPTION);

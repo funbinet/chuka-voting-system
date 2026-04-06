@@ -97,7 +97,7 @@ public class ManageElectionsPanel extends JPanel {
         topBar.add(Box.createVerticalStrut(8));
         topBar.add(searchRow);
 
-        String[] cols = {"ID", "Title", "Faculty", "Position", "Start Date", "End Date", "Status"};
+        String[] cols = {"No.", "ID", "Title", "Faculty", "Position", "Start Date", "End Date", "Status"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -112,6 +112,7 @@ public class ManageElectionsPanel extends JPanel {
         table.getTableHeader().setFont(Constants.FONT_BUTTON);
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
+        hideInternalIdColumn();
 
         editBtn = new JButton("✏️ Edit Election");
         editBtn.setFont(Constants.FONT_BUTTON);
@@ -189,6 +190,7 @@ public class ManageElectionsPanel extends JPanel {
         tableModel.setRowCount(0);
         List<Election> elections = electionService.getAllElections();
         String term = search == null ? "" : search.trim().toLowerCase();
+        int displayNo = 1;
         for (Election election : elections) {
             if (!term.isEmpty()) {
                 String title = election.getTitle() == null ? "" : election.getTitle().toLowerCase();
@@ -202,6 +204,7 @@ public class ManageElectionsPanel extends JPanel {
             }
 
             tableModel.addRow(new Object[]{
+            displayNo++,
                     election.getElectionId(),
                     election.getTitle(),
                     election.getFacultyName(),
@@ -219,7 +222,8 @@ public class ManageElectionsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select an election first.", "Selection Required", JOptionPane.WARNING_MESSAGE);
             return null;
         }
-        return (int) tableModel.getValueAt(row, 0);
+        int modelRow = table.convertRowIndexToModel(row);
+        return (int) tableModel.getValueAt(modelRow, 1);
     }
 
     private void deleteSelectedElection() {
@@ -229,8 +233,9 @@ public class ManageElectionsPanel extends JPanel {
             return;
         }
 
-        int electionId = (int) tableModel.getValueAt(row, 0);
-        String title = String.valueOf(tableModel.getValueAt(row, 1));
+        int modelRow = table.convertRowIndexToModel(row);
+        int electionId = (int) tableModel.getValueAt(modelRow, 1);
+        String title = String.valueOf(tableModel.getValueAt(modelRow, 2));
 
         int confirm = JOptionPane.showConfirmDialog(
                 this,
@@ -369,6 +374,12 @@ public class ManageElectionsPanel extends JPanel {
             System.err.println("❌ Faculty map load error: " + e.getMessage());
         }
         return map;
+    }
+
+    private void hideInternalIdColumn() {
+        table.getColumnModel().getColumn(1).setMinWidth(0);
+        table.getColumnModel().getColumn(1).setMaxWidth(0);
+        table.getColumnModel().getColumn(1).setPreferredWidth(0);
     }
 
     private void showCreateDialog() {

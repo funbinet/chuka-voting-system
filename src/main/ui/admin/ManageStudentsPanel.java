@@ -118,7 +118,7 @@ public class ManageStudentsPanel extends JPanel {
         actionBar.add(importBtn);
 
         // Table
-        String[] cols = {"ID", "Reg Number", "Full Name", "Faculty", "Year", "GPA", "Gender", "Resident", "Verified", "Active"};
+        String[] cols = {"No.", "ID", "Reg Number", "Full Name", "Faculty", "Year", "GPA", "Gender", "Resident", "Verified", "Active"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -130,6 +130,7 @@ public class ManageStudentsPanel extends JPanel {
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
         table.setSelectionBackground(new Color(200, 220, 255));
+        hideInternalIdColumn();
 
         JScrollPane tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createEmptyBorder());
@@ -304,8 +305,10 @@ public class ManageStudentsPanel extends JPanel {
                 ps.setString(2, "%" + search + "%");
             }
             ResultSet rs = ps.executeQuery();
+            int displayNo = 1;
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
+                    displayNo++,
                     rs.getInt("student_id"),
                     rs.getString("reg_number"),
                     rs.getString("full_name"),
@@ -329,7 +332,8 @@ public class ManageStudentsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select a student to edit.", "Edit Student", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        int studentId = (int) tableModel.getValueAt(row, 0);
+        int modelRow = table.convertRowIndexToModel(row);
+        int studentId = (int) tableModel.getValueAt(modelRow, 1);
         Student student = studentDAO.findById(studentId);
         if (student == null) {
             JOptionPane.showMessageDialog(this, "Could not load selected student.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -344,8 +348,9 @@ public class ManageStudentsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select a student to delete.", "Delete Student", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        int studentId = (int) tableModel.getValueAt(row, 0);
-        String studentName = String.valueOf(tableModel.getValueAt(row, 2));
+        int modelRow = table.convertRowIndexToModel(row);
+        int studentId = (int) tableModel.getValueAt(modelRow, 1);
+        String studentName = String.valueOf(tableModel.getValueAt(modelRow, 3));
 
         int confirm = JOptionPane.showConfirmDialog(
                 this,
@@ -565,6 +570,12 @@ public class ManageStudentsPanel extends JPanel {
         dialog.add(scrollPane, BorderLayout.CENTER);
         dialog.add(buttonBar, BorderLayout.SOUTH);
         dialog.setVisible(true);
+    }
+
+    private void hideInternalIdColumn() {
+        table.getColumnModel().getColumn(1).setMinWidth(0);
+        table.getColumnModel().getColumn(1).setMaxWidth(0);
+        table.getColumnModel().getColumn(1).setPreferredWidth(0);
     }
 
     private void loadFacultiesIntoCombo(JComboBox<FacultyItem> combo) {

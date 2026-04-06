@@ -83,7 +83,7 @@ public class AuditLogsPanel extends JPanel {
         topPanel.add(exportBtn, BorderLayout.EAST);
 
         // --- Table ---
-        String[] columns = {"ID", "Student/User", "Action", "Description", "Timestamp"};
+        String[] columns = {"No.", "ID", "Student/User", "Action", "Description", "Timestamp"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) { return false; }
@@ -92,6 +92,7 @@ public class AuditLogsPanel extends JPanel {
         table.setRowHeight(30);
         table.getTableHeader().setFont(Constants.FONT_BUTTON);
         table.setFont(Constants.FONT_BODY);
+        hideInternalIdColumn();
 
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
@@ -117,9 +118,11 @@ public class AuditLogsPanel extends JPanel {
         tableModel.setRowCount(0);
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        int displayNo = 1;
 
         for (AuditLog log : logs) {
             tableModel.addRow(new Object[]{
+                displayNo++,
                 log.getLogId(),
                 log.getStudentName() != null ? log.getStudentName() : "System",
                 log.getAction(),
@@ -127,6 +130,12 @@ public class AuditLogsPanel extends JPanel {
                 sdf.format(log.getLoggedAt())
             });
         }
+    }
+
+    private void hideInternalIdColumn() {
+        table.getColumnModel().getColumn(1).setMinWidth(0);
+        table.getColumnModel().getColumn(1).setMaxWidth(0);
+        table.getColumnModel().getColumn(1).setPreferredWidth(0);
     }
 
     private void handleExportCSV() {

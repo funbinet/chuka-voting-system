@@ -43,7 +43,7 @@ public class ElectionDAO {
     public Election findById(int electionId) {
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
-                "JOIN positions p ON e.position_id = p.position_id " +
+                "LEFT JOIN positions p ON e.position_id = p.position_id " +
                 "WHERE e.election_id = ?";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, electionId);
@@ -61,7 +61,7 @@ public class ElectionDAO {
         List<Election> list = new ArrayList<>();
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
-                "JOIN positions p ON e.position_id = p.position_id " +
+                "LEFT JOIN positions p ON e.position_id = p.position_id " +
                 "WHERE (e.faculty_id = ? OR e.faculty_id IS NULL) ORDER BY e.start_date DESC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, facultyId);
@@ -79,7 +79,7 @@ public class ElectionDAO {
         List<Election> list = new ArrayList<>();
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
-                "JOIN positions p ON e.position_id = p.position_id " +
+                "LEFT JOIN positions p ON e.position_id = p.position_id " +
                 "WHERE (e.faculty_id = ? OR e.faculty_id IS NULL) AND e.status = ? ORDER BY e.start_date ASC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, facultyId);
@@ -98,7 +98,7 @@ public class ElectionDAO {
         List<Election> list = new ArrayList<>();
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
-                "JOIN positions p ON e.position_id = p.position_id " +
+                "LEFT JOIN positions p ON e.position_id = p.position_id " +
                 "WHERE e.status = ? ORDER BY e.start_date ASC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setString(1, Constants.STATUS_ACTIVE);
@@ -116,7 +116,7 @@ public class ElectionDAO {
         List<Election> list = new ArrayList<>();
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
-                "JOIN positions p ON e.position_id = p.position_id " +
+                "LEFT JOIN positions p ON e.position_id = p.position_id " +
                 "ORDER BY e.start_date DESC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ResultSet rs = ps.executeQuery();
@@ -233,8 +233,10 @@ public class ElectionDAO {
         e.setTitle(rs.getString("title"));
         e.setFacultyId(rs.getInt("faculty_id"));
         e.setFacultyName(rs.getString("faculty_name") == null ? "University Global" : rs.getString("faculty_name"));
-        e.setPositionId(rs.getInt("position_id"));
-        e.setPositionName(rs.getString("position_name"));
+        int positionId = rs.getInt("position_id");
+        e.setPositionId(rs.wasNull() ? 0 : positionId);
+        String positionName = rs.getString("position_name");
+        e.setPositionName(positionName == null || positionName.trim().isEmpty() ? "Unassigned Position" : positionName);
         e.setStartDate(rs.getTimestamp("start_date"));
         e.setEndDate(rs.getTimestamp("end_date"));
         e.setStatus(rs.getString("status"));
