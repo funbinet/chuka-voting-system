@@ -1,6 +1,7 @@
 package main.dao;
 
 import main.models.Candidate;
+import main.models.Coalition;
 import main.utils.Constants;
 
 import java.sql.*;
@@ -15,13 +16,18 @@ public class CandidateDAO {
         return DBConnection.getInstance().getConnection();
     }
 
-    public boolean applyForCandidacy(int studentId, int positionId, String manifesto) {
-        String sql = "INSERT INTO candidate_applications (student_id, position_id, manifesto, status) VALUES (?,?,?,?)";
+    public boolean applyForCandidacy(int studentId, int positionId, String manifesto, Integer coalitionId) {
+        String sql = "INSERT INTO candidate_applications (student_id, position_id, manifesto, status, coalition_id) VALUES (?,?,?,?,?)";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, studentId);
             ps.setInt(2, positionId);
             ps.setString(3, manifesto);
             ps.setString(4, Constants.APP_PENDING);
+            if (coalitionId != null && coalitionId > 0) {
+                ps.setInt(5, coalitionId);
+            } else {
+                ps.setNull(5, java.sql.Types.INTEGER);
+            }
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("âŒ Apply candidacy error: " + e.getMessage());
@@ -293,6 +299,32 @@ public class CandidateDAO {
         return -1;
     }
 
+    public int getTargetElectionId(Integer facultyId, int positionId) {
+        String sql;
+        if (facultyId != null && facultyId > 0) {
+            sql = "SELECT election_id FROM elections WHERE position_id=? AND status=? AND (faculty_id=? OR faculty_id IS NULL) " +
+                    "ORDER BY start_date ASC LIMIT 1";
+        } else {
+            sql = "SELECT election_id FROM elections WHERE position_id=? AND status=? AND faculty_id IS NULL " +
+                    "ORDER BY start_date ASC LIMIT 1";
+        }
+
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setInt(1, positionId);
+            ps.setString(2, Constants.STATUS_UPCOMING);
+            if (facultyId != null && facultyId > 0) {
+                ps.setInt(3, facultyId);
+            }
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("election_id");
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Get target election by position error: " + e.getMessage());
+        }
+        return -1;
+    }
+
     public boolean addCandidateToElection(int electionId, int applicationId) {
         String sql = "INSERT INTO election_candidates (election_id, application_id) VALUES (?,?)";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
@@ -301,6 +333,36 @@ public class CandidateDAO {
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("âŒ Add to election candidates error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean updateApplicationDetails(int applicationId, int positionId, String manifesto, Integer coalitionId) {
+        String sql = "UPDATE candidate_applications SET position_id = ?, manifesto = ?, coalition_id = ? WHERE application_id = ?";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setInt(1, positionId);
+            ps.setString(2, manifesto);
+            if (coalitionId != null && coalitionId > 0) {
+                ps.setInt(3, coalitionId);
+            } else {
+                ps.setNull(3, Types.INTEGER);
+            }
+            ps.setInt(4, applicationId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("❌ Update application details error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean removeApplicationFromAllElections(int applicationId) {
+        String sql = "DELETE FROM election_candidates WHERE application_id = ?";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setInt(1, applicationId);
+            ps.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            System.err.println("❌ Remove application from elections error: " + e.getMessage());
             return false;
         }
     }
@@ -377,11 +439,12 @@ public class CandidateDAO {
 
     private String baseApplicationQuery() {
         return "SELECT ca.*, s.full_name, s.reg_number, s.year_of_study, s.gpa, s.faculty_id, " +
-                "f.faculty_name, p.position_name " +
+                "f.faculty_name, p.position_name, col.name as coalition_name " +
                 "FROM candidate_applications ca " +
                 "JOIN students s ON ca.student_id = s.student_id " +
                 "JOIN positions p ON ca.position_id = p.position_id " +
-                "JOIN faculties f ON s.faculty_id = f.faculty_id";
+                "JOIN faculties f ON s.faculty_id = f.faculty_id " +
+                "LEFT JOIN coalitions col ON ca.coalition_id = col.coalition_id";
     }
 
     private Candidate mapRow(ResultSet rs) throws SQLException {
@@ -403,6 +466,18 @@ public class CandidateDAO {
         c.setReviewedBy(rs.getInt("reviewed_by"));
         c.setFacultyId(rs.getInt("faculty_id"));
         c.setFacultyName(rs.getString("faculty_name"));
+        int coalitionId = rs.getInt("coalition_id");
+        if (rs.wasNull()) {
+            c.setCoalitionId(null);
+            c.setCoalitionName("Independent");
+            c.setCoalition(null);
+        } else {
+            String coalitionName = rs.getString("coalition_name");
+            Coalition coalition = new Coalition(coalitionId, coalitionName, null);
+            c.setCoalition(coalition);
+            c.setCoalitionId(coalitionId);
+            c.setCoalitionName(coalitionName);
+        }
         return c;
     }
 }

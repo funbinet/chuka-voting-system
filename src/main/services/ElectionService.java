@@ -184,7 +184,7 @@ public class ElectionService {
 
     public String validateAllPositionsFilled() {
         List<main.models.Faculty> faculties = facultyDAO.getAllFaculties();
-        int[] facultyPositions = {101, 102, 103};
+        int[] facultyPositions = {101};
         int[] generalPositions = {104, 105, 106, 107};
 
         for (main.models.Faculty f : faculties) {
@@ -206,7 +206,7 @@ public class ElectionService {
 
     public int createAllStandardElections(Timestamp start, Timestamp end, int adminId) {
         List<main.models.Faculty> faculties = facultyDAO.getAllFaculties();
-        int[] facultyPositions = {101, 102, 103};
+        int[] facultyPositions = {101};
         int[] generalPositions = {104, 105, 106, 107};
         int createdCount = 0;
 
@@ -230,12 +230,10 @@ public class ElectionService {
     private String getPosName(int id) {
         switch(id) {
             case 101: return "Faculty Chairman";
-            case 102: return "Faculty Secretary";
-            case 103: return "Faculty Treasurer";
-            case 104: return "Female Resident";
-            case 105: return "Male Resident";
-            case 106: return "Female Non-Resident";
-            case 107: return "Male Non-Resident";
+            case 104: return "Female Resident Representative";
+            case 105: return "Male Resident Representative";
+            case 106: return "Female Non-Resident Representative";
+            case 107: return "Male Non-Resident Representative";
             default: return "Unknown Position";
         }
     }

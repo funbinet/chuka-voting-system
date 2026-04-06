@@ -13,9 +13,10 @@ public class RoleSelectionFrame extends JFrame {
     public RoleSelectionFrame() {
         setTitle(Constants.APP_NAME + " — Welcome");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(480, 500);
+        setSize(520, 540);
+        setMinimumSize(Constants.MIN_ROLE_SELECTION_SIZE);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
 
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Constants.COLOR_BG);

@@ -21,8 +21,8 @@ public class StudentDAO {
         String hashedPassword = PasswordHasher.hash(plainPassword, salt);
 
         String sql = "INSERT INTO students (reg_number, full_name, email, phone_number, " +
-                     "password_hash, password_salt, faculty_id, year_of_study, gpa, gender, is_verified, password_changed) " +
-                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+                     "password_hash, password_salt, faculty_id, year_of_study, gpa, gender, is_resident, is_verified, password_changed) " +
+                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setString(1, student.getRegNumber().trim().toUpperCase());
             ps.setString(2, student.getFullName());
@@ -34,8 +34,9 @@ public class StudentDAO {
             ps.setInt(8, student.getYearOfStudy());
             ps.setDouble(9, student.getGpa());
             ps.setString(10, student.getGender());
-            ps.setBoolean(11, true); // Students added by admin are pre-verified
-            ps.setBoolean(12, false); // Initial password must be changed
+            ps.setBoolean(11, student.isResident());
+            ps.setBoolean(12, true); // Students added by admin are pre-verified
+            ps.setBoolean(13, false); // Initial password must be changed
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("❌ Create student error: " + e.getMessage());
@@ -192,6 +193,40 @@ public class StudentDAO {
         }
     }
 
+    public boolean updateStudentRecord(Student student) {
+        String sql = "UPDATE students SET reg_number=?, full_name=?, email=?, phone_number=?, faculty_id=?, " +
+                "year_of_study=?, gpa=?, gender=?, is_resident=?, is_active=? WHERE student_id=?";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setString(1, student.getRegNumber().trim().toUpperCase());
+            ps.setString(2, student.getFullName());
+            ps.setString(3, student.getEmail().trim().toLowerCase());
+            ps.setString(4, student.getPhoneNumber());
+            ps.setInt(5, student.getFacultyId());
+            ps.setInt(6, student.getYearOfStudy());
+            ps.setDouble(7, student.getGpa());
+            ps.setString(8, student.getGender());
+            ps.setBoolean(9, student.isResident());
+            ps.setBoolean(10, student.isActive());
+            ps.setInt(11, student.getStudentId());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("❌ Update student record error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean setStudentActive(int studentId, boolean active) {
+        String sql = "UPDATE students SET is_active = ? WHERE student_id = ?";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setBoolean(1, active);
+            ps.setInt(2, studentId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("❌ Set active status error: " + e.getMessage());
+            return false;
+        }
+    }
+
     // Total active students in a faculty
     public int getTotalStudentsByFaculty(int facultyId) {
         String sql = "SELECT COUNT(*) FROM students WHERE faculty_id = ? AND is_active = TRUE";
@@ -202,6 +237,42 @@ public class StudentDAO {
         } catch (SQLException e) {
             System.err.println("❌ Get total students error: " + e.getMessage());
         }
+        return 0;
+    }
+
+    // Total eligible voters for a specific election scope and position rules.
+    public int getEligibleVoterCount(int facultyId, String positionName) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM students WHERE is_active = TRUE");
+
+        if (facultyId > 0) {
+            sql.append(" AND faculty_id = ?");
+        }
+
+        String position = positionName == null ? "" : positionName.toLowerCase();
+        if (position.contains("female")) {
+            sql.append(" AND UPPER(gender) = 'FEMALE'");
+        } else if (position.contains("male")) {
+            sql.append(" AND UPPER(gender) = 'MALE'");
+        }
+
+        if (position.contains("non-resident") || position.contains("non resident")) {
+            sql.append(" AND is_resident = FALSE");
+        } else if (position.contains("resident")) {
+            sql.append(" AND is_resident = TRUE");
+        }
+
+        try (PreparedStatement ps = getConnection().prepareStatement(sql.toString())) {
+            if (facultyId > 0) {
+                ps.setInt(1, facultyId);
+            }
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Get eligible voter count error: " + e.getMessage());
+        }
+
         return 0;
     }
 

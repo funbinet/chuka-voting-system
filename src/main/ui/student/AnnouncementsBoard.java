@@ -119,7 +119,10 @@ public class AnnouncementsBoard extends JPanel {
                 
                 for (main.models.Candidate c : positionCands) {
                     int vCount = votes.getOrDefault(c.getApplicationId(), 0);
-                    sb.append("<li>").append(c.getStudentName()).append(" — <b style='color:#d9534f'>").append(vCount).append(" votes</b></li>");
+                    sb.append("<li>")
+                      .append(c.getStudentName())
+                      .append(" (<i>").append(c.getCoalitionName()).append("</i>)")
+                      .append(" — <b style='color:#d9534f'>").append(vCount).append(" votes</b></li>");
                 }
                 sb.append("</ul>");
             }

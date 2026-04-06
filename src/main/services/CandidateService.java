@@ -1,6 +1,7 @@
 package main.services;
 
 import main.dao.CandidateDAO;
+import main.dao.CoalitionDAO;
 import main.dao.StudentDAO;
 import main.models.Candidate;
 import main.models.Student;
@@ -11,6 +12,7 @@ import java.util.List;
 public class CandidateService {
 
     private final CandidateDAO candidateDAO;
+    private final CoalitionDAO coalitionDAO;
     private final StudentDAO studentDAO;
     private final main.dao.AdminNotificationDAO notificationDAO;
     private final AuditService auditService;
@@ -18,13 +20,14 @@ public class CandidateService {
 
     public CandidateService() {
         this.candidateDAO = new CandidateDAO();
+        this.coalitionDAO = new CoalitionDAO();
         this.studentDAO = new StudentDAO();
         this.notificationDAO = new main.dao.AdminNotificationDAO();
         this.auditService = AuditService.getInstance();
         this.lastMessage = "";
     }
 
-    public String addCandidateDirectly(String regNumber, int positionId, String manifesto, int adminId) {
+    public String addCandidateDirectly(String regNumber, int positionId, String manifesto, int adminId, Integer coalitionId) {
         Student student = studentDAO.findByRegNumber(regNumber);
         if (student == null) {
             lastMessage = "Student with registration number " + regNumber + " not found.";
@@ -53,7 +56,8 @@ public class CandidateService {
             return lastMessage;
         }
 
-        boolean success = candidateDAO.applyForCandidacy(student.getStudentId(), positionId, manifesto != null ? manifesto.trim() : "");
+        Integer normalizedCoalitionId = normalizeCoalitionId(coalitionId);
+        boolean success = candidateDAO.applyForCandidacy(student.getStudentId(), positionId, manifesto != null ? manifesto.trim() : "", normalizedCoalitionId);
         if (!success) {
             lastMessage = "Failed to add the candidate application.";
             return lastMessage;
@@ -75,7 +79,7 @@ public class CandidateService {
 
         boolean approved = candidateDAO.approveApplication(applicationId, adminId);
         if (approved) {
-            int targetElectionId = candidateDAO.getTargetElectionId(student.getFacultyId());
+            int targetElectionId = candidateDAO.getTargetElectionId(student.getFacultyId(), positionId);
             if (targetElectionId != -1) {
                 candidateDAO.addCandidateToElection(targetElectionId, applicationId);
                 lastMessage = "Candidate added and approved for the upcoming election successfully.";
@@ -91,7 +95,7 @@ public class CandidateService {
         return lastMessage;
     }
 
-    public boolean applyForCandidacyStudent(int studentId, int positionId, String manifesto, main.models.Position position) {
+    public boolean applyForCandidacyStudent(int studentId, int positionId, String manifesto, main.models.Position position, Integer coalitionId) {
         Student student = studentDAO.findById(studentId);
         if (student == null) {
             lastMessage = "Student not found.";
@@ -142,7 +146,8 @@ public class CandidateService {
             return false;
         }
 
-        boolean success = candidateDAO.applyForCandidacy(studentId, positionId, manifesto != null ? manifesto.trim() : "");
+        Integer normalizedCoalitionId = normalizeCoalitionId(coalitionId);
+        boolean success = candidateDAO.applyForCandidacy(studentId, positionId, manifesto != null ? manifesto.trim() : "", normalizedCoalitionId);
         if (success) {
             main.models.AdminNotification notif = new main.models.AdminNotification(
                 0, // 0 = global for all admins
@@ -163,7 +168,10 @@ public class CandidateService {
     public String approveStudentApplication(int applicationId, int adminId, int facultyId) {
         boolean approved = candidateDAO.approveApplication(applicationId, adminId);
         if (approved) {
-            int targetElectionId = candidateDAO.getTargetElectionId(facultyId);
+            Candidate app = candidateDAO.findById(applicationId);
+            int targetElectionId = (app != null)
+                    ? candidateDAO.getTargetElectionId(facultyId, app.getPositionId())
+                    : candidateDAO.getTargetElectionId(facultyId);
             if (targetElectionId != -1) {
                 candidateDAO.addCandidateToElection(targetElectionId, applicationId);
                 auditService.log(null, "CANDIDATE_APPROVED", "Admin " + adminId + " approved application " + applicationId);
@@ -201,7 +209,48 @@ public class CandidateService {
         return ok;
     }
 
+    public String updateCandidateApplication(int applicationId, int positionId, String manifesto, Integer coalitionId, int adminId) {
+        Candidate current = candidateDAO.findById(applicationId);
+        if (current == null) {
+            return "Candidate application not found.";
+        }
+
+        Integer normalizedCoalitionId = normalizeCoalitionId(coalitionId);
+        boolean updated = candidateDAO.updateApplicationDetails(
+                applicationId,
+                positionId,
+                manifesto != null ? manifesto.trim() : "",
+                normalizedCoalitionId
+        );
+
+        if (!updated) {
+            return "Failed to update candidate details.";
+        }
+
+        Candidate refreshed = candidateDAO.findById(applicationId);
+        if (refreshed != null
+                && Constants.APP_APPROVED.equalsIgnoreCase(refreshed.getStatus())
+                && current.getPositionId() != positionId) {
+            candidateDAO.removeApplicationFromAllElections(applicationId);
+            int targetElectionId = candidateDAO.getTargetElectionId(refreshed.getFacultyId(), positionId);
+            if (targetElectionId != -1) {
+                candidateDAO.addCandidateToElection(targetElectionId, applicationId);
+            }
+        }
+
+        auditService.log(null, "CANDIDATE_UPDATED",
+                "Admin " + adminId + " updated candidate application " + applicationId + " (position " + positionId + ")");
+        return "Candidate details updated successfully.";
+    }
+
     public String getLastMessage() {
         return lastMessage;
+    }
+
+    private Integer normalizeCoalitionId(Integer coalitionId) {
+        if (coalitionId == null || coalitionId <= 0) {
+            return null;
+        }
+        return coalitionDAO.existsById(coalitionId) ? coalitionId : null;
     }
 }

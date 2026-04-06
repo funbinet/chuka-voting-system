@@ -11,6 +11,9 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,7 +22,9 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ManageElectionsPanel extends JPanel {
 
@@ -27,6 +32,9 @@ public class ManageElectionsPanel extends JPanel {
     private final ElectionService electionService;
     private JTable table;
     private DefaultTableModel tableModel;
+    private JTextField searchField;
+    private JButton editBtn;
+    private JButton deleteBtn;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ManageElectionsPanel(Admin admin) {
@@ -39,77 +47,53 @@ public class ManageElectionsPanel extends JPanel {
     }
 
     private void buildUI() {
-        JPanel topBar = new JPanel(new BorderLayout());
+        JPanel topBar = new JPanel();
+        topBar.setLayout(new BoxLayout(topBar, BoxLayout.Y_AXIS));
         topBar.setBackground(Constants.COLOR_BG);
-        topBar.setBorder(new EmptyBorder(0, 0, 10, 0));
+        topBar.setBorder(new EmptyBorder(0, 0, 12, 0));
 
         JLabel heading = new JLabel("Manage Elections");
         heading.setFont(Constants.FONT_HEADING);
         heading.setForeground(Constants.COLOR_PRIMARY);
 
-        JButton createBtn = new JButton("Create Election");
-        createBtn.setFont(Constants.FONT_BUTTON);
-        createBtn.setBackground(Constants.COLOR_SUCCESS);
-        createBtn.setForeground(Color.WHITE);
-        createBtn.setFocusPainted(false);
-        createBtn.setBorderPainted(false);
-        createBtn.addActionListener(e -> showCreateDialog());
+        JPanel headingRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        headingRow.setBackground(Constants.COLOR_BG);
+        headingRow.add(heading);
 
-        JButton bulkCreateBtn = new JButton("🚀 Add All Elections");
-        bulkCreateBtn.setFont(Constants.FONT_BUTTON);
-        bulkCreateBtn.setBackground(Constants.COLOR_PRIMARY);
-        bulkCreateBtn.setForeground(Color.WHITE);
-        bulkCreateBtn.setFocusPainted(false);
-        bulkCreateBtn.setBorderPainted(false);
-        bulkCreateBtn.addActionListener(e -> showBulkCreateDialog());
+        searchField = new JTextField(26);
+        searchField.setFont(Constants.FONT_BODY);
 
-        JButton editBtn = new JButton("Edit");
-        editBtn.setFont(Constants.FONT_BUTTON);
-        editBtn.setBackground(Constants.COLOR_SECONDARY);
-        editBtn.setForeground(Color.WHITE);
-        editBtn.setFocusPainted(false);
-        editBtn.setBorderPainted(false);
-        editBtn.setEnabled(false);
-        editBtn.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row != -1) {
-                int electionId = (int) tableModel.getValueAt(row, 0);
-                showEditDialog(electionId);
-            }
+        JButton searchBtn = new JButton("🔍 Search");
+        searchBtn.setFont(Constants.FONT_BUTTON);
+        searchBtn.setBackground(Constants.COLOR_SECONDARY);
+        searchBtn.setForeground(Color.WHITE);
+        searchBtn.setFocusPainted(false);
+        searchBtn.setBorderPainted(false);
+        searchBtn.addActionListener(e -> loadElections(searchField.getText().trim()));
+
+        JButton refreshBtn = new JButton("↺ Refresh");
+        refreshBtn.setFont(Constants.FONT_BUTTON);
+        refreshBtn.setBackground(Constants.COLOR_PRIMARY);
+        refreshBtn.setForeground(Color.WHITE);
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setBorderPainted(false);
+        refreshBtn.addActionListener(e -> {
+            searchField.setText("");
+            loadElections("");
         });
 
-        JButton deleteBtn = new JButton("Delete");
-        deleteBtn.setFont(Constants.FONT_BUTTON);
-        deleteBtn.setBackground(Constants.COLOR_DANGER);
-        deleteBtn.setForeground(Color.WHITE);
-        deleteBtn.setFocusPainted(false);
-        deleteBtn.setBorderPainted(false);
-        deleteBtn.setEnabled(false);
-        deleteBtn.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row != -1) {
-                int electionId = (int) tableModel.getValueAt(row, 0);
-                String title = (String) tableModel.getValueAt(row, 1);
-                int confirm = JOptionPane.showConfirmDialog(this, 
-                    "Are you sure you want to permanently delete election '" + title + "'?\nAll associated candidates and votes will be cleared permanently.", 
-                    "Confirm Deletion", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                if (confirm == JOptionPane.YES_OPTION) {
-                    String result = electionService.deleteElection(electionId, admin.getAdminId());
-                    JOptionPane.showMessageDialog(this, result, result.contains("failed") ? "Error" : "Success", result.contains("failed") ? JOptionPane.ERROR_MESSAGE : JOptionPane.INFORMATION_MESSAGE);
-                    loadElections();
-                }
-            }
-        });
+        searchField.addActionListener(e -> loadElections(searchField.getText().trim()));
 
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        btnPanel.setBackground(Constants.COLOR_BG);
-        btnPanel.add(editBtn);
-        btnPanel.add(deleteBtn);
-        btnPanel.add(createBtn);
-        btnPanel.add(bulkCreateBtn);
+        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        searchRow.setBackground(Constants.COLOR_BG);
+        searchRow.add(new JLabel("Search:"));
+        searchRow.add(searchField);
+        searchRow.add(searchBtn);
+        searchRow.add(refreshBtn);
 
-        topBar.add(heading, BorderLayout.WEST);
-        topBar.add(btnPanel, BorderLayout.EAST);
+        topBar.add(headingRow);
+        topBar.add(Box.createVerticalStrut(8));
+        topBar.add(searchRow);
 
         String[] cols = {"ID", "Title", "Faculty", "Position", "Start Date", "End Date", "Status"};
         tableModel = new DefaultTableModel(cols, 0) {
@@ -127,21 +111,94 @@ public class ManageElectionsPanel extends JPanel {
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
 
+        editBtn = new JButton("✏️ Edit Election");
+        editBtn.setFont(Constants.FONT_BUTTON);
+        editBtn.setBackground(Constants.COLOR_SECONDARY);
+        editBtn.setForeground(Color.WHITE);
+        editBtn.setFocusPainted(false);
+        editBtn.setBorderPainted(false);
+        editBtn.setEnabled(false);
+        editBtn.addActionListener(e -> {
+            Integer electionId = getSelectedElectionId();
+            if (electionId != null) {
+                showEditDialog(electionId);
+            }
+        });
+
+        deleteBtn = new JButton("🗑️ Delete Election");
+        deleteBtn.setFont(Constants.FONT_BUTTON);
+        deleteBtn.setBackground(Constants.COLOR_DANGER);
+        deleteBtn.setForeground(Color.WHITE);
+        deleteBtn.setFocusPainted(false);
+        deleteBtn.setBorderPainted(false);
+        deleteBtn.setEnabled(false);
+        deleteBtn.addActionListener(e -> deleteSelectedElection());
+
+        JButton addBtn = new JButton("➕ Add Election");
+        addBtn.setFont(Constants.FONT_BUTTON);
+        addBtn.setBackground(Constants.COLOR_PRIMARY);
+        addBtn.setForeground(Color.WHITE);
+        addBtn.setFocusPainted(false);
+        addBtn.setBorderPainted(false);
+        addBtn.addActionListener(e -> showCreateDialog());
+
+        JButton importBtn = new JButton("📤 Bulk Import");
+        importBtn.setFont(Constants.FONT_BUTTON);
+        importBtn.setBackground(Constants.COLOR_SUCCESS);
+        importBtn.setForeground(Color.WHITE);
+        importBtn.setFocusPainted(false);
+        importBtn.setBorderPainted(false);
+        importBtn.addActionListener(e -> importElectionsFromCSV());
+
+        JButton addAllBtn = new JButton("🚀 Add All Elections (9)");
+        addAllBtn.setFont(Constants.FONT_BUTTON);
+        addAllBtn.setBackground(Constants.COLOR_PRIMARY);
+        addAllBtn.setForeground(Color.WHITE);
+        addAllBtn.setFocusPainted(false);
+        addAllBtn.setBorderPainted(false);
+        addAllBtn.addActionListener(e -> showBulkCreateDialog());
+
         table.getSelectionModel().addListSelectionListener(e -> {
             boolean selected = table.getSelectedRow() != -1;
             editBtn.setEnabled(selected);
             deleteBtn.setEnabled(selected);
         });
 
-        loadElections();
+        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 8));
+        actionBar.setBackground(Constants.COLOR_BG);
+        actionBar.setBorder(new EmptyBorder(10, 0, 0, 0));
+        actionBar.add(addBtn);
+        actionBar.add(editBtn);
+        actionBar.add(deleteBtn);
+        actionBar.add(importBtn);
+        actionBar.add(addAllBtn);
+
+        loadElections("");
         add(topBar, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
+        add(actionBar, BorderLayout.SOUTH);
     }
 
     private void loadElections() {
+        loadElections(searchField != null ? searchField.getText().trim() : "");
+    }
+
+    private void loadElections(String search) {
         tableModel.setRowCount(0);
         List<Election> elections = electionService.getAllElections();
+        String term = search == null ? "" : search.trim().toLowerCase();
         for (Election election : elections) {
+            if (!term.isEmpty()) {
+                String title = election.getTitle() == null ? "" : election.getTitle().toLowerCase();
+                String faculty = election.getFacultyName() == null ? "" : election.getFacultyName().toLowerCase();
+                String position = election.getPositionName() == null ? "" : election.getPositionName().toLowerCase();
+                String status = election.getStatus() == null ? "" : election.getStatus().toLowerCase();
+                String id = String.valueOf(election.getElectionId());
+                if (!(title.contains(term) || faculty.contains(term) || position.contains(term) || status.contains(term) || id.contains(term))) {
+                    continue;
+                }
+            }
+
             tableModel.addRow(new Object[]{
                     election.getElectionId(),
                     election.getTitle(),
@@ -152,6 +209,164 @@ public class ManageElectionsPanel extends JPanel {
                     election.getStatus()
             });
         }
+    }
+
+    private Integer getSelectedElectionId() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Please select an election first.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+        return (int) tableModel.getValueAt(row, 0);
+    }
+
+    private void deleteSelectedElection() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Please select an election to delete.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int electionId = (int) tableModel.getValueAt(row, 0);
+        String title = String.valueOf(tableModel.getValueAt(row, 1));
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Delete election '" + title + "'? This will also remove linked candidates and votes.",
+                "Confirm Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            String result = electionService.deleteElection(electionId, admin.getAdminId());
+            JOptionPane.showMessageDialog(
+                    this,
+                    result,
+                    result.toLowerCase().contains("failed") ? "Error" : "Success",
+                    result.toLowerCase().contains("failed") ? JOptionPane.ERROR_MESSAGE : JOptionPane.INFORMATION_MESSAGE
+            );
+            loadElections();
+        }
+    }
+
+    private void importElectionsFromCSV() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select Elections CSV File");
+        if (fileChooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File file = fileChooser.getSelectedFile();
+        Map<String, Integer> facultyMap = getFacultyCodeMap();
+        int imported = 0;
+        int errors = 0;
+        StringBuilder errorLog = new StringBuilder();
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            int lineNum = 0;
+            while ((line = br.readLine()) != null) {
+                lineNum++;
+                if (lineNum == 1 && line.toLowerCase().contains("title")) {
+                    continue;
+                }
+
+                String[] data = line.split(",");
+                if (data.length < 5) {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum)
+                            .append(": Expected columns title,position_id,faculty_code,start_date,end_date.\n");
+                    continue;
+                }
+
+                String title = data[0].trim();
+                String positionStr = data[1].trim();
+                String facultyCode = data[2].trim().toUpperCase();
+                String startStr = data[3].trim();
+                String endStr = data[4].trim();
+
+                if (title.isEmpty()) {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum).append(": Title is required.\n");
+                    continue;
+                }
+
+                int positionId;
+                try {
+                    positionId = Integer.parseInt(positionStr);
+                } catch (NumberFormatException ex) {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum).append(": Invalid position_id.\n");
+                    continue;
+                }
+
+                Timestamp startDate;
+                Timestamp endDate;
+                try {
+                    startDate = Timestamp.valueOf(LocalDateTime.parse(startStr, DATE_FORMATTER));
+                    endDate = Timestamp.valueOf(LocalDateTime.parse(endStr, DATE_FORMATTER));
+                } catch (DateTimeParseException ex) {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum).append(": Invalid date format (yyyy-MM-dd HH:mm:ss).\n");
+                    continue;
+                }
+
+                if (!endDate.after(startDate)) {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum).append(": End date must be after start date.\n");
+                    continue;
+                }
+
+                Integer facultyId = null;
+                if (!facultyCode.isEmpty() && !"GLOBAL".equals(facultyCode) && !"ALL".equals(facultyCode)) {
+                    facultyId = facultyMap.get(facultyCode);
+                    if (facultyId == null) {
+                        errors++;
+                        errorLog.append("Line ").append(lineNum).append(": Unknown faculty code '").append(facultyCode).append("'.\n");
+                        continue;
+                    }
+                }
+
+                String result = electionService.createElection(title, facultyId, positionId, startDate, endDate, admin.getAdminId());
+                if (result.toLowerCase().contains("successfully")) {
+                    imported++;
+                } else {
+                    errors++;
+                    errorLog.append("Line ").append(lineNum).append(": ").append(result).append("\n");
+                }
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error reading CSV file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+        panel.add(new JLabel(String.format("<html><b>Election Import Summary:</b><br>✅ Imported: %d<br>❌ Errors: %d</html>", imported, errors)), BorderLayout.NORTH);
+        if (errors > 0) {
+            JTextArea area = new JTextArea(errorLog.toString());
+            area.setEditable(false);
+            JScrollPane sp = new JScrollPane(area);
+            sp.setPreferredSize(new Dimension(420, 220));
+            panel.add(sp, BorderLayout.CENTER);
+        }
+
+        JOptionPane.showMessageDialog(this, panel, "CSV Import Results", JOptionPane.INFORMATION_MESSAGE);
+        loadElections();
+    }
+
+    private Map<String, Integer> getFacultyCodeMap() {
+        Map<String, Integer> map = new HashMap<>();
+        try (Connection conn = DBConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT faculty_id, faculty_code FROM faculties")) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                map.put(rs.getString("faculty_code").toUpperCase(), rs.getInt("faculty_id"));
+            }
+        } catch (SQLException e) {
+            System.err.println("❌ Faculty map load error: " + e.getMessage());
+        }
+        return map;
     }
 
     private void showCreateDialog() {
@@ -287,7 +502,7 @@ public class ManageElectionsPanel extends JPanel {
         gbc.gridx = 0;
         gbc.insets = new Insets(10, 0, 10, 0);
 
-        JLabel infoLabel = new JLabel("<html><b>Ready to create all 19 standard elections.</b><br>Please set the universal start and end date:</html>");
+        JLabel infoLabel = new JLabel("<html><b>Ready to create all 9 standard elections.</b><br>Please set the universal start and end date:</html>");
         infoLabel.setFont(Constants.FONT_BODY);
 
         LocalDateTime tomorrow = LocalDateTime.now().plusDays(1).withHour(8).withMinute(0).withSecond(0);
@@ -309,7 +524,7 @@ public class ManageElectionsPanel extends JPanel {
 
         gbc.gridy = 5;
         gbc.insets = new Insets(20, 0, 0, 0);
-        JButton createBtn = new JButton("INITIATE BULK CREATION (19 ELECTIONS)");
+        JButton createBtn = new JButton("INITIATE BULK CREATION (9 ELECTIONS)");
         createBtn.setFont(Constants.FONT_BUTTON);
         createBtn.setBackground(Constants.COLOR_SUCCESS);
         createBtn.setForeground(Color.WHITE);
@@ -331,7 +546,7 @@ public class ManageElectionsPanel extends JPanel {
             }
 
             int confirm = JOptionPane.showConfirmDialog(dialog, 
-                "This will generate 19 elections spanning all faculties and generic roles.\nProceed?", 
+                "This will generate 9 elections spanning faculty and university-wide roles.\nProceed?", 
                 "Confirm Bulk Action", JOptionPane.YES_NO_OPTION);
             
             if (confirm == JOptionPane.YES_OPTION) {
@@ -349,7 +564,7 @@ public class ManageElectionsPanel extends JPanel {
 
     private void loadPositionsIntoCombo(JComboBox<PositionItem> combo) {
         try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT * FROM positions WHERE faculty_id IS NULL ORDER BY position_id DESC")) {
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM positions WHERE faculty_id IS NULL ORDER BY position_name ASC")) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 combo.addItem(new PositionItem(

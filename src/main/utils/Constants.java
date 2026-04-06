@@ -1,6 +1,7 @@
 package main.utils;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 
 public class Constants {
@@ -51,4 +52,11 @@ public class Constants {
     // App Info
     public static final String APP_NAME    = "Chuka University Voting System";
     public static final String APP_VERSION = "1.0.0";
+
+    // Minimum window sizes to keep layouts readable
+    public static final Dimension MIN_ROLE_SELECTION_SIZE    = new Dimension(520, 540);
+    public static final Dimension MIN_ADMIN_LOGIN_SIZE       = new Dimension(520, 560);
+    public static final Dimension MIN_STUDENT_LOGIN_SIZE     = new Dimension(520, 620);
+    public static final Dimension MIN_ADMIN_DASHBOARD_SIZE   = new Dimension(1100, 700);
+    public static final Dimension MIN_STUDENT_DASHBOARD_SIZE = new Dimension(1100, 700);
 }

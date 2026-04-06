@@ -1,8 +1,11 @@
 package main.ui.admin;
 
+import main.dao.CoalitionDAO;
+import main.dao.CandidateDAO;
 import main.dao.DBConnection;
 import main.models.Admin;
 import main.models.Candidate;
+import main.models.Coalition;
 import main.models.Faculty;
 import main.models.Position;
 import main.services.CandidateService;
@@ -22,13 +25,17 @@ public class ReviewApplicationsPanel extends JPanel {
 
     private final Admin admin;
     private final CandidateService candidateService;
+    private final CandidateDAO candidateDAO;
     private JTable table;
     private DefaultTableModel tableModel;
     private JTextField searchField;
+    private JButton editBtn;
+    private JButton deleteBtn;
 
     public ReviewApplicationsPanel(Admin admin) {
         this.admin = admin;
         this.candidateService = new CandidateService();
+        this.candidateDAO = new CandidateDAO();
         setBackground(Constants.COLOR_BG);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -36,71 +43,59 @@ public class ReviewApplicationsPanel extends JPanel {
     }
 
     private void buildUI() {
-        JPanel topBar = new JPanel(new GridBagLayout());
+        JPanel topBar = new JPanel();
+        topBar.setLayout(new BoxLayout(topBar, BoxLayout.Y_AXIS));
         topBar.setBackground(Constants.COLOR_BG);
-        topBar.setBorder(new EmptyBorder(10, 15, 25, 15));
+        topBar.setBorder(new EmptyBorder(0, 0, 12, 0));
 
-        GridBagConstraints gbcTop = new GridBagConstraints();
-        gbcTop.fill = GridBagConstraints.HORIZONTAL;
-        gbcTop.weightx = 1.0;
-        gbcTop.gridx = 0;
-
-        // Row 1: Title
         JLabel heading = new JLabel("📝 Manage Candidates");
         heading.setFont(Constants.FONT_HEADING);
         heading.setForeground(Constants.COLOR_PRIMARY);
-        gbcTop.gridy = 0;
-        gbcTop.insets = new Insets(0, 0, 15, 0);
-        topBar.add(heading, gbcTop);
 
-        // Row 2: Action Bar (Buttons & Search)
-        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        searchBar.setBackground(Constants.COLOR_BG);
+        JPanel headingRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        headingRow.setBackground(Constants.COLOR_BG);
+        headingRow.add(heading);
 
-        JButton importBtn = new JButton("📤 Bulk Import");
-        importBtn.setFont(Constants.FONT_BUTTON);
-        importBtn.setBackground(Constants.COLOR_SUCCESS);
-        importBtn.setForeground(Color.WHITE);
-        importBtn.addActionListener(e -> importCandidatesFromCSV());
-
-        searchField = new JTextField(15);
+        searchField = new JTextField(26);
         searchField.setFont(Constants.FONT_BODY);
-        
+
         JButton searchBtn = new JButton("🔍 Search");
         searchBtn.setFont(Constants.FONT_BUTTON);
         searchBtn.setBackground(Constants.COLOR_SECONDARY);
         searchBtn.setForeground(Color.WHITE);
+        searchBtn.setFocusPainted(false);
+        searchBtn.setBorderPainted(false);
         searchBtn.addActionListener(e -> loadCandidates(searchField.getText().trim()));
 
         JButton refreshBtn = new JButton("↺ Refresh");
         refreshBtn.setFont(Constants.FONT_BUTTON);
         refreshBtn.setBackground(Constants.COLOR_PRIMARY);
         refreshBtn.setForeground(Color.WHITE);
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setBorderPainted(false);
         refreshBtn.addActionListener(e -> {
             searchField.setText("");
             loadCandidates("");
         });
 
-        JButton addBtn = new JButton("Direct Add");
-        addBtn.setFont(Constants.FONT_BUTTON);
-        addBtn.addActionListener(e -> showAddCandidateDialog());
+        searchField.addActionListener(e -> loadCandidates(searchField.getText().trim()));
 
-        searchBar.add(importBtn);
-        searchBar.add(new JLabel(" Search: "));
-        searchBar.add(searchField);
-        searchBar.add(searchBtn);
-        searchBar.add(refreshBtn);
-        searchBar.add(addBtn);
+        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        searchRow.setBackground(Constants.COLOR_BG);
+        searchRow.add(new JLabel("Search:"));
+        searchRow.add(searchField);
+        searchRow.add(searchBtn);
+        searchRow.add(refreshBtn);
 
-        gbcTop.gridy = 1;
-        gbcTop.insets = new Insets(0, 0, 0, 0);
-        topBar.add(searchBar, gbcTop);
+        topBar.add(headingRow);
+        topBar.add(Box.createVerticalStrut(8));
+        topBar.add(searchRow);
 
-        String[] cols = {"ID", "Name", "Reg Number", "Faculty", "Position", "Status", "Action"};
+        String[] cols = {"ID", "Name", "Reg Number", "Faculty", "Position", "Coalition", "Status", "Action"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 6; // Only the action column is interactive
+                return column == 7; // Only the action column is interactive
             }
         };
 
@@ -110,12 +105,60 @@ public class ReviewApplicationsPanel extends JPanel {
         table.getTableHeader().setFont(Constants.FONT_BUTTON);
         table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
         table.getTableHeader().setForeground(Color.WHITE);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        table.getTableHeader().setForeground(Color.WHITE);
+        JButton addBtn = new JButton("➕ Add Candidate");
+        addBtn.setFont(Constants.FONT_BUTTON);
+        addBtn.setBackground(Constants.COLOR_PRIMARY);
+        addBtn.setForeground(Color.WHITE);
+        addBtn.setFocusPainted(false);
+        addBtn.setBorderPainted(false);
+        addBtn.addActionListener(e -> showAddCandidateDialog());
 
-        loadCandidates();
+        editBtn = new JButton("✏️ Edit Candidate");
+        editBtn.setFont(Constants.FONT_BUTTON);
+        editBtn.setBackground(Constants.COLOR_SECONDARY);
+        editBtn.setForeground(Color.WHITE);
+        editBtn.setFocusPainted(false);
+        editBtn.setBorderPainted(false);
+        editBtn.setEnabled(false);
+        editBtn.addActionListener(e -> showEditCandidateDialog());
+
+        deleteBtn = new JButton("🗑️ Delete Candidate");
+        deleteBtn.setFont(Constants.FONT_BUTTON);
+        deleteBtn.setBackground(Constants.COLOR_DANGER);
+        deleteBtn.setForeground(Color.WHITE);
+        deleteBtn.setFocusPainted(false);
+        deleteBtn.setBorderPainted(false);
+        deleteBtn.setEnabled(false);
+        deleteBtn.addActionListener(e -> removeSelectedCandidate());
+
+        JButton importBtn = new JButton("📤 Bulk Import");
+        importBtn.setFont(Constants.FONT_BUTTON);
+        importBtn.setBackground(Constants.COLOR_SUCCESS);
+        importBtn.setForeground(Color.WHITE);
+        importBtn.setFocusPainted(false);
+        importBtn.setBorderPainted(false);
+        importBtn.addActionListener(e -> importCandidatesFromCSV());
+
+        table.getSelectionModel().addListSelectionListener(e -> {
+            boolean selected = table.getSelectedRow() != -1;
+            editBtn.setEnabled(selected);
+            deleteBtn.setEnabled(selected);
+        });
+
+        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 8));
+        actionBar.setBackground(Constants.COLOR_BG);
+        actionBar.setBorder(new EmptyBorder(10, 0, 0, 0));
+        actionBar.add(addBtn);
+        actionBar.add(editBtn);
+        actionBar.add(deleteBtn);
+        actionBar.add(importBtn);
+
+        loadCandidates("");
         add(topBar, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
+        add(actionBar, BorderLayout.SOUTH);
     }
 
     private void loadCandidates() {
@@ -131,7 +174,7 @@ public class ReviewApplicationsPanel extends JPanel {
             if (s.isEmpty() || c.getStudentName().toLowerCase().contains(s) || c.getRegNumber().toLowerCase().contains(s)) {
                 tableModel.addRow(new Object[]{
                         c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
-                        c.getFacultyName(), c.getPositionName(), c.getStatus(), "APPROVE"
+                        c.getFacultyName(), c.getPositionName(), c.getCoalitionName(), c.getStatus(), "APPROVE"
                 });
             }
         }
@@ -141,13 +184,169 @@ public class ReviewApplicationsPanel extends JPanel {
             if (s.isEmpty() || c.getStudentName().toLowerCase().contains(s) || c.getRegNumber().toLowerCase().contains(s)) {
                 tableModel.addRow(new Object[]{
                         c.getApplicationId(), c.getStudentName(), c.getRegNumber(),
-                        c.getFacultyName(), c.getPositionName(), c.getStatus(), "REMOVE"
+                        c.getFacultyName(), c.getPositionName(), c.getCoalitionName(), c.getStatus(), "REMOVE"
                 });
             }
         }
         
         table.getColumn("Action").setCellRenderer(new ButtonRenderer());
         table.getColumn("Action").setCellEditor(new ButtonEditor(new JCheckBox()));
+    }
+
+    private Integer getSelectedApplicationId() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Please select a candidate first.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+        return (int) tableModel.getValueAt(row, 0);
+    }
+
+    private void removeSelectedCandidate() {
+        Integer appId = getSelectedApplicationId();
+        if (appId == null) {
+            return;
+        }
+
+        int row = table.getSelectedRow();
+        String name = String.valueOf(tableModel.getValueAt(row, 1));
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Delete candidate '" + name + "' from candidacy?",
+                "Confirm Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            boolean ok = candidateService.removeCandidate(appId, admin.getAdminId());
+            JOptionPane.showMessageDialog(
+                    this,
+                    ok ? "Candidate removed successfully." : "Failed to remove candidate.",
+                    ok ? "Success" : "Error",
+                    ok ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE
+            );
+            loadCandidates();
+        }
+    }
+
+    private void showEditCandidateDialog() {
+        Integer appId = getSelectedApplicationId();
+        if (appId == null) {
+            return;
+        }
+
+        Candidate existing = candidateDAO.findById(appId);
+        if (existing == null) {
+            JOptionPane.showMessageDialog(this, "Could not load selected candidate application.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Edit Candidate", true);
+        dialog.setSize(520, 520);
+        dialog.setMinimumSize(new Dimension(480, 460));
+        dialog.setLocationRelativeTo(this);
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Constants.COLOR_BG);
+        panel.setBorder(new EmptyBorder(20, 30, 20, 30));
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.weightx = 1.0;
+        gbc.insets = new Insets(7, 0, 7, 0);
+
+        JLabel studentLabel = new JLabel(existing.getStudentName() + " (" + existing.getRegNumber() + ")");
+        studentLabel.setFont(Constants.FONT_BODY);
+
+        JComboBox<PositionItem> positionCombo = new JComboBox<>();
+        positionCombo.setFont(Constants.FONT_BODY);
+        loadPositionsIntoCombo(positionCombo);
+        selectPositionInCombo(existing.getPositionId(), positionCombo);
+
+        JComboBox<Coalition> coalitionCombo = new JComboBox<>();
+        coalitionCombo.setFont(Constants.FONT_BODY);
+        coalitionCombo.addItem(new Coalition(0, "Independent (No Coalition)", ""));
+        for (Coalition coalition : new CoalitionDAO().getAllCoalitions()) {
+            coalitionCombo.addItem(coalition);
+        }
+        if (existing.getCoalitionId() != null) {
+            for (int i = 0; i < coalitionCombo.getItemCount(); i++) {
+                Coalition c = coalitionCombo.getItemAt(i);
+                if (c.getCoalitionId() == existing.getCoalitionId()) {
+                    coalitionCombo.setSelectedIndex(i);
+                    break;
+                }
+            }
+        } else {
+            coalitionCombo.setSelectedIndex(0);
+        }
+
+        JTextArea manifestoArea = new JTextArea(existing.getManifesto() == null ? "" : existing.getManifesto(), 6, 20);
+        manifestoArea.setLineWrap(true);
+        manifestoArea.setWrapStyleWord(true);
+        manifestoArea.setFont(Constants.FONT_BODY);
+        JScrollPane scroll = new JScrollPane(manifestoArea);
+
+        int row = 0;
+        gbc.gridy = row++; panel.add(makeLabel("Student:"), gbc);
+        gbc.gridy = row++; panel.add(studentLabel, gbc);
+        gbc.gridy = row++; panel.add(makeLabel("Position:"), gbc);
+        gbc.gridy = row++; panel.add(positionCombo, gbc);
+        gbc.gridy = row++; panel.add(makeLabel("Coalition / Party:"), gbc);
+        gbc.gridy = row++; panel.add(coalitionCombo, gbc);
+        gbc.gridy = row++; panel.add(makeLabel("Manifesto:"), gbc);
+        gbc.gridy = row++; panel.add(scroll, gbc);
+
+        JButton saveBtn = new JButton("SAVE CHANGES");
+        saveBtn.setFont(Constants.FONT_BUTTON);
+        saveBtn.setBackground(Constants.COLOR_PRIMARY);
+        saveBtn.setForeground(Color.WHITE);
+        saveBtn.setFocusPainted(false);
+        saveBtn.setBorderPainted(false);
+        saveBtn.setPreferredSize(new Dimension(0, 42));
+        saveBtn.addActionListener(e -> {
+            PositionItem selectedPosition = (PositionItem) positionCombo.getSelectedItem();
+            if (selectedPosition == null) {
+                JOptionPane.showMessageDialog(dialog, "Please select a position.", "Validation", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            Coalition selectedCoal = (Coalition) coalitionCombo.getSelectedItem();
+            Integer coalitionId = (selectedCoal != null && selectedCoal.getCoalitionId() > 0) ? selectedCoal.getCoalitionId() : null;
+
+            String result = candidateService.updateCandidateApplication(
+                    appId,
+                    selectedPosition.id,
+                    manifestoArea.getText(),
+                    coalitionId,
+                    admin.getAdminId()
+            );
+
+            JOptionPane.showMessageDialog(dialog, result);
+            if (result.toLowerCase().contains("successfully")) {
+                loadCandidates();
+                dialog.dispose();
+            }
+        });
+
+        gbc.gridy = row;
+        gbc.insets = new Insets(15, 0, 0, 0);
+        panel.add(saveBtn, gbc);
+
+        dialog.add(panel);
+        dialog.setVisible(true);
+    }
+
+    private void selectPositionInCombo(int positionId, JComboBox<PositionItem> combo) {
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            PositionItem item = combo.getItemAt(i);
+            if (item.id == positionId) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
     }
 
     private void importCandidatesFromCSV() {
@@ -179,7 +378,7 @@ public class ReviewApplicationsPanel extends JPanel {
 
                 try {
                     int posId = Integer.parseInt(posIdStr);
-                    String result = candidateService.addCandidateDirectly(reg, posId, manifesto, admin.getAdminId());
+                    String result = candidateService.addCandidateDirectly(reg, posId, manifesto, admin.getAdminId(), null);
                     if (result.toLowerCase().contains("successfully")) {
                         imported++;
                     } else {
@@ -253,6 +452,14 @@ public class ReviewApplicationsPanel extends JPanel {
             positionCombo.setSelectedIndex(0);
         }
 
+        // Coalition ComboBox
+        JComboBox<Coalition> coalitionCombo = new JComboBox<>();
+        coalitionCombo.setFont(Constants.FONT_BODY);
+        coalitionCombo.addItem(new Coalition(0, "Independent (No Coalition)", ""));
+        for (Coalition coal : new CoalitionDAO().getAllCoalitions()) {
+            coalitionCombo.addItem(coal);
+        }
+
         JTextArea manifestoArea = new JTextArea(4, 20);
         manifestoArea.setLineWrap(true);
         manifestoArea.setWrapStyleWord(true);
@@ -265,6 +472,8 @@ public class ReviewApplicationsPanel extends JPanel {
         gbc.gridy = row++; panel.add(positionCombo, gbc);
         gbc.gridy = row++; panel.add(makeLabel("Select Faculty (If Faculty Role):"), gbc);
         gbc.gridy = row++; panel.add(facultyCombo, gbc);
+        gbc.gridy = row++; panel.add(makeLabel("Coalition / Party:"), gbc);
+        gbc.gridy = row++; panel.add(coalitionCombo, gbc);
         gbc.gridy = row++; panel.add(makeLabel("Manifesto (Optional):"), gbc);
         gbc.gridy = row++; panel.add(scroll, gbc);
 
@@ -287,7 +496,9 @@ public class ReviewApplicationsPanel extends JPanel {
                 return;
             }
 
-            String msg = candidateService.addCandidateDirectly(reg, pos.id, manifestoArea.getText(), admin.getAdminId());
+            Coalition selectedCoal = (Coalition) coalitionCombo.getSelectedItem();
+            Integer coalId = (selectedCoal != null && selectedCoal.getCoalitionId() > 0) ? selectedCoal.getCoalitionId() : null;
+            String msg = candidateService.addCandidateDirectly(reg, pos.id, manifestoArea.getText(), admin.getAdminId(), coalId);
             JOptionPane.showMessageDialog(dialog, msg);
             if (msg.contains("successfully")) {
                 loadCandidates();
@@ -316,7 +527,7 @@ public class ReviewApplicationsPanel extends JPanel {
 
     private void loadPositionsIntoCombo(JComboBox<PositionItem> combo) {
         try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT * FROM positions WHERE faculty_id IS NULL ORDER BY position_id DESC")) {
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM positions WHERE faculty_id IS NULL ORDER BY position_name ASC")) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 combo.addItem(new PositionItem(rs.getInt("position_id"), rs.getString("position_name")));

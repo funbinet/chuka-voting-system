@@ -23,9 +23,10 @@ public class AdminLoginFrame extends JFrame {
     private void initUI() {
         setTitle(Constants.APP_NAME + " — Admin Login");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(480, 520);
+        setSize(520, 560);
+        setMinimumSize(Constants.MIN_ADMIN_LOGIN_SIZE);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
 
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Constants.COLOR_BG);

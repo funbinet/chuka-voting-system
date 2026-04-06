@@ -27,9 +27,10 @@ public class StudentLoginFrame extends JFrame {
     private void initUI() {
         setTitle(Constants.APP_NAME + " — Login");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(480, 580);
+        setSize(520, 620);
+        setMinimumSize(Constants.MIN_STUDENT_LOGIN_SIZE);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
 
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Constants.COLOR_BG);

@@ -23,7 +23,8 @@ public class ResultsPDFExporter {
     private static final PDType1Font FONT_ITALIC = new PDType1Font(Standard14Fonts.FontName.HELVETICA_OBLIQUE);
 
     public static void exportElectionResults(Election election, List<Candidate> candidates,
-                                             Map<Integer, Integer> voteData, int totalEligible, File file) throws IOException {
+                                             Map<Integer, Integer> voteData, int totalEligible,
+                                             int totalVotesCast, File file) throws IOException {
 
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage();
@@ -67,8 +68,6 @@ public class ResultsPDFExporter {
                     byPosition.computeIfAbsent(c.getPositionName(), k -> new ArrayList<>()).add(c);
                 }
 
-                int totalVotesCast = 0;
-
                 for (Map.Entry<String, List<Candidate>> entry : byPosition.entrySet()) {
                     y -= 20;
                     contentStream.beginText();
@@ -85,7 +84,6 @@ public class ResultsPDFExporter {
                     for (Candidate c : entry.getValue()) {
                         posTotal += voteData.getOrDefault(c.getApplicationId(), 0);
                     }
-                    totalVotesCast = Math.max(totalVotesCast, posTotal);
 
                     for (Candidate c : entry.getValue()) {
                         int votes = voteData.getOrDefault(c.getApplicationId(), 0);

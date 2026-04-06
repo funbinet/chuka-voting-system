@@ -62,7 +62,7 @@ public class ElectionDAO {
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
                 "JOIN positions p ON e.position_id = p.position_id " +
-                "WHERE e.faculty_id = ? ORDER BY e.start_date DESC";
+                "WHERE (e.faculty_id = ? OR e.faculty_id IS NULL) ORDER BY e.start_date DESC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, facultyId);
             ResultSet rs = ps.executeQuery();
@@ -80,7 +80,7 @@ public class ElectionDAO {
         String sql = "SELECT e.*, f.faculty_name, p.position_name FROM elections e " +
                 "LEFT JOIN faculties f ON e.faculty_id = f.faculty_id " +
                 "JOIN positions p ON e.position_id = p.position_id " +
-                "WHERE e.faculty_id = ? AND e.status = ? ORDER BY e.start_date ASC";
+                "WHERE (e.faculty_id = ? OR e.faculty_id IS NULL) AND e.status = ? ORDER BY e.start_date ASC";
         try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
             ps.setInt(1, facultyId);
             ps.setString(2, Constants.STATUS_ACTIVE);

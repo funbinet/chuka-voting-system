@@ -1,131 +1,421 @@
-# Chuka University Voting System (CUVS)
+# Chuka University Voting System (Kadi)
 
-A clean, modular, and secure electronic voting platform designed for university elections. This system handles student candidacies, faculty-based administration, and real-time visual analytics for election results.
+A Java Swing election platform for university voting with student and admin portals, first-login OTP verification, candidacy workflows, coalition support, election lifecycle automation, and visual result analytics.
 
-## Overview
+## Table of Contents
 
-The CUVS is built with a focus on **modular architecture** and **database resilience**. It replaces legacy faculty-specific position structures with a canonical set of 7 position types, enabling dynamic election creation for any faculty or university-wide role.
+- [What This System Does](#what-this-system-does)
+- [Core Features](#core-features)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Quick Start (Linux)](#quick-start-linux)
+- [Quick Start (Windows)](#quick-start-windows)
+- [Configuration](#configuration)
+- [Seeded Demo Accounts](#seeded-demo-accounts)
+- [Student Screens and Flows](#student-screens-and-flows)
+- [Admin Screens and Flows](#admin-screens-and-flows)
+- [Database Model Summary](#database-model-summary)
+- [Security and Integrity Rules](#security-and-integrity-rules)
+- [Multi-User Behavior](#multi-user-behavior)
+- [Troubleshooting](#troubleshooting)
+- [Developer Notes](#developer-notes)
+- [Recent Stability Fixes](#recent-stability-fixes)
+- [Pre-Push Checklist](#pre-push-checklist)
 
-### Key Features
+## What This System Does
 
-- **Generic Position Framework**: Support for Faculty Chairman, Secretary, Treasurer, and Residence-based roles without hardcoded faculty dependencies.
-- **Robust Database Connectivity**: Implements an auto-reconnect singleton pattern (`DBConnection`) to handle MySQL session timeouts gracefully.
-- **Automated Administration**: Bulk student imports via CSV, direct candidate management, and real-time audit logging.
-- **Secure Authentication**: OTP-based verification for first-time logins and SHA-256 password hashing.
-- **Visual Analytics**: Interactive bar charts and data visualization for live election results.
+The system supports a full election cycle:
 
----
+1. Students authenticate, verify OTP on first login, and change password.
+2. Students can apply for candidacy (with coalition or as independent).
+3. Admins review/approve/reject candidates.
+4. Admins create elections, or bulk-create standard elections.
+5. Students vote in active elections they are eligible for.
+6. Admins and students view results (student sees final closed elections; admin sees visual analytics and exports).
+7. System records audit logs for major actions.
 
-## Technical Stack
+## Core Features
 
-- **Lanuage**: Java 17+
-- **Frontend**: Java Swing (Custom UI Components)
-- **Database**: MySQL 8.0
-- **Containerization**: Docker & Docker Compose
-- **Build System**: Custom Shell Wrapper (`run.sh`)
+- Role-based login flow (Student/Admin).
+- OTP flow for first login and password reset flow.
+- Candidate application + admin review workflow.
+- Coalition management (create/edit/delete/import).
+- Election lifecycle management (UPCOMING -> ACTIVE -> CLOSED) with auto-sync.
+- Position and profile-based voting eligibility (gender/residency/faculty constraints).
+- One vote per student per election-position rule.
+- Admin data management with CSV import tools.
+- Results dashboard with charts and PDF export.
+- Auditing and CSV export for logs.
 
----
+## Architecture
 
-## Getting Started
+The app follows a layered structure:
 
-### Prerequisites
+- UI layer: Swing frames/panels for student/admin workflows.
+- Service layer: business rules, validation, orchestration.
+- DAO layer: SQL persistence logic.
+- Model layer: domain objects (`Student`, `Election`, `Candidate`, etc.).
 
-- **Linux** (Recommended): Docker and Docker Compose installed.
-- **Windows**: 
-  - **Java JDK 17+** installed.
-  - **MySQL Server** installed and running.
-  - **MySQL Workbench** or similar tool for schema management.
+Key runtime components:
 
----
+- `DBConnection`: singleton connection provider with reconnect-aware instance refresh.
+- `AuthService`: session role routing, credential verification, OTP verification hook.
+- `ElectionService`: status synchronization and election business rules.
+- `VotingService`: vote validation and persistence checks.
+- `AuditService`: centralized audit event recording.
 
-## Installation & Run
+## Project Structure
 
-### 🐧 For Linux (Automated via Docker)
+```
+resources/
+   config.properties
+   db/schema.sql
+src/main/
+   Main.java
+   dao/
+   models/
+   services/
+   ui/
+   utils/
+project-images/
+run.sh
+docker-compose.yml
+```
 
-The setup process for Linux is fully automated using Docker.
+## Requirements
 
-1. **Clone & Navigate**:
-   ```bash
-   git clone https://github.com/funbinet/chuka-voting-system.git
-   cd chuka-voting-system
-   ```
-2. **Run**:
-   ```bash
-   chmod +x run.sh
-   ./run.sh
-   ```
+- Java JDK 17+
+- MySQL 8+
+- Linux path (recommended): Docker + Docker Compose
+- Windows path: local MySQL + manual schema import
 
-*The script will automatically:*
-- Spin up the MySQL database using Docker Compose.
-- Compile the Java source files and launch the application.
+## Quick Start (Linux)
 
----
+Linux path is automated via Docker + `run.sh`.
 
-### 🪟 For Windows (Manual Configuration)
+1. Make script executable:
 
-Windows users should follow these manual steps to set up the environment:
+```bash
+chmod +x run.sh
+```
 
-#### 1. Prepare the Database
-- Open **MySQL Workbench** or your preferred MySQL client.
-- Open and run the SQL schema script located at: `resources/db/schema.sql`.
-- This will create the `chuka_voting_db` and all necessary tables.
+2. One-command start:
 
-#### 2. Configure the Application
-- Navigate to the `resources/` folder.
-- Open `config.properties` in a text editor.
-- Update the following fields to match your local MySQL credentials:
-  ```properties
-  db.host=localhost
-  db.port=3306
-  db.name=chuka_voting_db
-  db.user=root
-  db.password=your_password_here
-  ```
+```bash
+./run.sh
+```
 
-#### 3. Run the Application
-You can run the application using your IDE (like IntelliJ or Eclipse) or via the command line:
+This default mode performs:
 
-- **Using Command Line**:
-  1. Open PowerShell or CMD in the project root.
-  2. Compile the project (ensure `javac` is in your PATH):
-     ```powershell
-     mkdir out
-     dir /s /b src\*.java > sources.txt
-     javac -cp "lib/*" -d out @sources.txt
-     del sources.txt
-     xcopy /e /i /y resources out
-     ```
-  3. Launch the application:
-     ```powershell
-     java -cp "out;lib/*" main.Main
-     ```
+- dependency checks,
+- Docker DB startup,
+- DB readiness wait,
+- Java compilation,
+- application launch.
 
----
+Useful script modes:
+
+- `./run.sh setup` -> dependency + DB only.
+- `./run.sh compile` -> compile only.
+- `./run.sh run` -> run app (compiles first if classes missing).
+
+Docker DB defaults for Linux flow:
+
+- host: `localhost`
+- port: `3308`
+- database: `chuka_voting_db`
+- username: `root`
+- password: `chuka_root_2024`
+
+## Quick Start (Windows)
+
+1. Create DB schema:
+
+- Run `resources/db/schema.sql` in MySQL Workbench (or any MySQL client).
+
+2. Set DB config:
+
+- Edit `resources/config.properties`:
+
+```properties
+db.host=localhost
+db.port=3306
+db.name=chuka_voting_db
+db.user=root
+db.password=your_password
+```
+
+3. Compile:
+
+```powershell
+mkdir out
+dir /s /b src\*.java > sources.txt
+javac -cp "lib/*" -d out @sources.txt
+del sources.txt
+xcopy /e /i /y resources out
+```
+
+4. Run:
+
+```powershell
+java -cp "out;lib/*" main.Main
+```
+
+IDE note:
+
+- Ensure `resources/` is on runtime classpath so `config.properties` is discoverable.
 
 ## Configuration
 
-The application uses a multi-layered configuration approach managed in `src/main/utils/DBConfig.java`:
+DB resolution order in `DBConfig`:
 
-1.  **Environment Variables**: Highest priority (used by Docker on Linux).
-2.  **config.properties**: Used for manual setup (Primary method for Windows).
-3.  **Default Values**: Fallback credentials.
+1. Environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`)
+2. `resources/config.properties`
+3. hardcoded defaults
 
-**Config File Location**: `resources/config.properties`
+This lets Linux/Docker and Windows/local workflows coexist cleanly.
 
----
+## Seeded Demo Accounts
 
-## Database Schema
+From `resources/db/schema.sql` seed data:
 
-The system uses a highly normalized schema with foreign key constraints. The core of the modularity lies in the `positions` table, which uses `NULL` faculty references for generic roles, allowing them to be bound to any faculty dynamically during election creation.
+- Admin:
+   - Email: `admin@chuka.ac.ke`
+   - Password: `Student@123`
 
-Seeding script: `resources/db/schema.sql`
+- Multiple student records are pre-seeded.
+   - Initial Password: `Student@123`
 
----
+Important first-login behavior:
 
-## Contributors
+- Student first login requires OTP verification and then forced password change.
 
-Special thanks to the development team at Chuka University. This project is maintained and updated for academic and institutional transparency.
+## Student Screens and Flows
+
+### Student Dashboard
+
+Shows profile summary, active-election countdown cards, and quick actions.
+
+![Student Dashboard](project-images/student_dashboard.png)
+
+### Student Announcements
+
+Displays active announcements and live election update cards.
+
+![Student Announcements](project-images/student_announcements.png)
+
+### Student Voting Panel
+
+Lists eligible active elections and candidate cards by position. Includes vote confirmation and duplicate-vote prevention.
+
+![Student Voting](project-images/student_voting.png)
+
+### Student Results Panel
+
+Shows closed election standings by position.
+
+![Student Results](project-images/student_results.png)
+
+### Apply for Candidacy
+
+Student submits candidacy with manifesto and coalition selection (or independent).
+
+![Student Apply Candidacy](project-images/student_apply_candidacy.png)
+
+## Admin Screens and Flows
+
+### Admin Dashboard
+
+Home cards for all admin modules and top-bar notifications.
+
+![Admin Dashboard](project-images/admin_dashboard.png)
+
+### Manage Elections
+
+Create/edit/delete elections, bulk import elections, and bulk-create standard election pack.
+
+![Admin Elections](project-images/admin_elections.png)
+
+### Manage Candidates
+
+Review candidate applications, approve/remove candidates, edit candidate details, and CSV import.
+
+![Admin Candidates](project-images/admin_candidates.png)
+
+### Manage Coalitions
+
+Create/edit/delete coalitions and bulk import from CSV.
+
+![Admin Coalitions](project-images/admin_coalitions.png)
+
+### Manage Announcements
+
+Create, search, delete, and clear announcements.
+
+![Admin Announcements](project-images/admin_announcements.png)
+
+### Manage Students
+
+CRUD-style management with CSV import and account deactivation.
+
+![Admin Students](project-images/admin_students.png)
+
+### Audit Logs
+
+Filter by date/search and export CSV.
+
+![Admin Audit Logs](project-images/admin_logs.png)
+
+### Results Analytics
+
+Election turnout analytics, position charts, and PDF export.
+
+![Admin Results](project-images/admin_results.png)
+
+## Database Model Summary
+
+Primary tables:
+
+- `students`, `admins`, `faculties`, `positions`
+- `candidate_applications`, `coalitions`, `nominations`
+- `elections`, `election_candidates`, `votes`
+- `announcements`, `admin_notifications`
+- `otp_logs`, `audit_logs`
+
+Important constraints:
+
+- `votes`: unique `(student_id, election_id, position_id)` to enforce one vote per position.
+- `candidate_applications`: unique `(student_id, position_id)`.
+- coalition FK set null on coalition delete to preserve candidate rows.
+
+## Security and Integrity Rules
+
+- Passwords are SHA-256 + per-user salt.
+- OTP entries expire and track failed attempts.
+- Election/position/profile checks run before vote insert.
+- Audit events are written for major auth, candidate, and election actions.
+
+## Multi-User Behavior
+
+- The system supports many users concurrently across different running app instances/devices, backed by shared MySQL state.
+- Each running desktop process maintains a single active in-memory session context for that process.
+
+## Troubleshooting
+
+### 1) App says database connection failed
+
+Symptoms:
+
+- startup dialog from `Main` with MySQL connection error.
+
+Fix:
+
+1. Verify DB is running.
+2. Verify host/port/user/password in env vars or `resources/config.properties`.
+3. Verify schema was imported (`resources/db/schema.sql`).
+4. If on Linux Docker flow, run:
+
+```bash
+docker compose ps
+docker compose logs db
+```
+
+### 2) Port 3308 already in use (Linux)
+
+Fix:
+
+1. Stop conflicting service or change mapping in `docker-compose.yml`.
+2. Re-run `./run.sh setup`.
+
+### 3) `docker compose` / `docker-compose` not found
+
+Fix:
+
+- Install Docker + Compose plugin.
+- Confirm with:
+
+```bash
+docker compose version
+```
+
+### 4) MySQL JDBC driver not found
+
+Fix:
+
+- Ensure connector JAR exists under `lib/` and classpath includes `lib/*`.
+
+### 5) OTP not received
+
+Expected behavior in this build:
+
+- OTP delivery is simulation-first. Check terminal output for generated OTP under SMS simulation logs.
+
+### 6) Election creation fails with "No approved candidates"
+
+Cause:
+
+- Election creation enforces approved candidate availability for target position/faculty.
+
+Fix:
+
+1. Approve at least one candidate for that position.
+2. Retry election creation.
+
+### 7) Candidate approved but not in expected election
+
+Cause:
+
+- Candidate binding follows position/faculty eligibility rules and election status sync.
+
+Fix:
+
+1. Confirm candidate position matches election position.
+2. Confirm election scope (faculty/global) matches candidate profile.
+3. Refresh election statuses and candidate list in admin UI.
+
+### 8) Build works in terminal but IDE fails to find config/resources
+
+Fix:
+
+- Mark `resources/` as resource folder in IDE, or copy resources into build output as in command-line steps.
+
+## Developer Notes
+
+Helpful commands:
+
+```bash
+# Linux Docker lifecycle
+docker compose up -d
+docker compose logs -f db
+docker compose down
+
+# Compile only
+./run.sh compile
+
+# Setup only (dependencies + DB)
+./run.sh setup
+```
+
+## Recent Stability Fixes
+
+The latest hardening pass included:
+
+- fixed admin PDF turnout to use real distinct voter turnout input,
+- fixed vote confirmation email to use readable position name,
+- prevented coalition DAO from closing shared singleton DB connection on each operation,
+- added announcement create validation to block empty title/body posts,
+- improved dashboard lifecycle cleanup to reduce timer/session leaks during refresh/logout.
+
+## Pre-Push Checklist
+
+- `./run.sh compile` succeeds.
+- Linux flow runs with `./run.sh`.
+- Windows flow verified with local MySQL + `config.properties`.
+- All `project-images/*.png` render in README on GitHub.
+- Admin and student critical paths smoke-tested.
+- No unresolved merge conflicts or accidental secrets in repo.
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License.

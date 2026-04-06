@@ -59,11 +59,19 @@ public class VotingService {
             auditService.log(studentId, "VOTE_FAILED", lastMessage);
             return lastMessage;
         }
-        if (student.getFacultyId() != election.getFacultyId()) {
+        if (election.getFacultyId() > 0 && student.getFacultyId() != election.getFacultyId()) {
             lastMessage = "You may only vote in elections for your faculty.";
             auditService.log(studentId, "VOTE_FAILED", lastMessage);
             return lastMessage;
         }
+
+        String eligibilityError = validatePositionEligibility(student, election);
+        if (eligibilityError != null) {
+            lastMessage = eligibilityError;
+            auditService.log(studentId, "VOTE_FAILED", lastMessage);
+            return lastMessage;
+        }
+
         if (voteDAO.hasVoted(studentId, electionId, positionId)) {
             lastMessage = "You have already voted for this position.";
             auditService.log(studentId, "VOTE_FAILED", lastMessage);
@@ -80,7 +88,10 @@ public class VotingService {
         auditService.log(studentId, success ? "VOTE_CAST" : "VOTE_FAILED",
                 "Election ID " + electionId + ", position ID " + positionId + ". " + lastMessage);
         if (success) {
-            emailService.sendVoteConfirmationEmail(student, election.getTitle(), String.valueOf(positionId));
+            String positionLabel = (election.getPositionName() == null || election.getPositionName().isBlank())
+                    ? ("Position " + positionId)
+                    : election.getPositionName();
+            emailService.sendVoteConfirmationEmail(student, election.getTitle(), positionLabel);
         }
         return lastMessage;
     }
@@ -93,6 +104,13 @@ public class VotingService {
         return voteDAO.getTotalVotes(electionId);
     }
 
+    public int getEligibleVoterCount(Election election) {
+        if (election == null) {
+            return 0;
+        }
+        return studentDAO.getEligibleVoterCount(election.getFacultyId(), election.getPositionName());
+    }
+
     public List<Candidate> getCandidatesForElection(int electionId) {
         return candidateService.getCandidatesForElection(electionId);
     }
@@ -103,5 +121,31 @@ public class VotingService {
 
     public String getLastMessage() {
         return lastMessage;
+    }
+
+    private String validatePositionEligibility(Student student, Election election) {
+        String position = election.getPositionName() == null ? "" : election.getPositionName().toLowerCase();
+
+        if (position.contains("female")) {
+            if (!"FEMALE".equalsIgnoreCase(student.getGender())) {
+                return "Only female students can vote for this position.";
+            }
+        } else if (position.contains("male")) {
+            if (!"MALE".equalsIgnoreCase(student.getGender())) {
+                return "Only male students can vote for this position.";
+            }
+        }
+
+        if (position.contains("non-resident") || position.contains("non resident")) {
+            if (student.isResident()) {
+                return "Only non-resident students can vote for this position.";
+            }
+        } else if (position.contains("resident")) {
+            if (!student.isResident()) {
+                return "Only resident students can vote for this position.";
+            }
+        }
+
+        return null;
     }
 }

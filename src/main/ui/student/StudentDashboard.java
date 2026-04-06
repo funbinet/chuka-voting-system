@@ -13,6 +13,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class StudentDashboard extends JFrame {
@@ -20,6 +21,7 @@ public class StudentDashboard extends JFrame {
     private Student         student;
     private JPanel          contentPanel;
     private ElectionService electionService;
+    private final List<Timer> countdownTimers = new ArrayList<>();
 
     public StudentDashboard(Student student) {
         this.student         = student;
@@ -32,6 +34,7 @@ public class StudentDashboard extends JFrame {
         setTitle("Student Dashboard — " + student.getFullName());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(950, 650);
+        setMinimumSize(Constants.MIN_STUDENT_DASHBOARD_SIZE);
         setLocationRelativeTo(null);
 
         JPanel mainPanel = new JPanel(new BorderLayout());
@@ -73,6 +76,7 @@ public class StudentDashboard extends JFrame {
         logoutBtn.setFocusPainted(false);
         logoutBtn.setBorderPainted(false);
         logoutBtn.addActionListener(e -> {
+            stopCountdownTimers();
             SessionManager.getInstance().stopSession();
             AuthService.logout();
             dispose();
@@ -86,6 +90,8 @@ public class StudentDashboard extends JFrame {
         refreshBtn.setFocusPainted(false);
         refreshBtn.setBorderPainted(false);
         refreshBtn.addActionListener(e -> {
+            stopCountdownTimers();
+            SessionManager.getInstance().stopSession();
             dispose();
             new StudentDashboard(student);
         });
@@ -129,6 +135,7 @@ public class StudentDashboard extends JFrame {
     }
 
     private void handleSidebarClick(String menu) {
+        stopCountdownTimers();
         contentPanel.removeAll();
         if (menu.contains("Home"))                showHome();
         else if (menu.contains("Announcements"))  showAnnouncementsBoard();
@@ -146,6 +153,8 @@ public class StudentDashboard extends JFrame {
     }
 
     private void showHome() {
+        stopCountdownTimers();
+
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Constants.COLOR_BG);
 
@@ -169,9 +178,22 @@ public class StudentDashboard extends JFrame {
         countdowns.setBackground(Constants.COLOR_BG);
         
         List<Election> activeElections = electionService.getActiveElectionsForFaculty(student.getFacultyId());
+        int eligibleCount = 0;
         for (Election e : activeElections) {
+            if (!isEligibleForElection(e)) {
+                continue;
+            }
+            eligibleCount++;
             countdowns.add(createCountdownPanel(e));
             countdowns.add(Box.createVerticalStrut(10));
+        }
+
+        if (eligibleCount == 0) {
+            JLabel none = new JLabel("No active elections matching your profile right now.");
+            none.setFont(Constants.FONT_BODY);
+            none.setForeground(Color.GRAY);
+            none.setHorizontalAlignment(JLabel.CENTER);
+            countdowns.add(none);
         }
 
         // Stats cards
@@ -181,12 +203,40 @@ public class StudentDashboard extends JFrame {
         cards.add(makeStatCard("📊", "Results", "View election results", Constants.COLOR_SECONDARY));
 
         gbc.gridy = 0; panel.add(welcome, gbc);
-        if (!activeElections.isEmpty()) {
+        if (eligibleCount > 0) {
             gbc.gridy = 1; panel.add(countdowns, gbc);
         }
         gbc.gridy = 2; panel.add(cards, gbc);
 
         contentPanel.add(new JScrollPane(panel), BorderLayout.CENTER);
+    }
+
+    private boolean isEligibleForElection(Election election) {
+        if (election == null) {
+            return false;
+        }
+
+        if (election.getFacultyId() > 0 && election.getFacultyId() != student.getFacultyId()) {
+            return false;
+        }
+
+        String position = election.getPositionName() == null ? "" : election.getPositionName().toLowerCase();
+
+        if (position.contains("female") && !"FEMALE".equalsIgnoreCase(student.getGender())) {
+            return false;
+        }
+        if (position.contains("male") && !position.contains("female") && !"MALE".equalsIgnoreCase(student.getGender())) {
+            return false;
+        }
+
+        if ((position.contains("non-resident") || position.contains("non resident")) && student.isResident()) {
+            return false;
+        }
+        if (position.contains("resident") && !(position.contains("non-resident") || position.contains("non resident")) && !student.isResident()) {
+            return false;
+        }
+
+        return true;
     }
 
     private JPanel createCountdownPanel(Election election) {
@@ -222,13 +272,21 @@ public class StudentDashboard extends JFrame {
         });
         timer.start();
 
+        countdownTimers.add(timer);
+
         p.add(titleLbl, BorderLayout.WEST);
         p.add(timerLbl, BorderLayout.EAST);
         
-        // Ensure timer stops when panel is removed or dashboard closed
-        p.putClientProperty("timer", timer); 
-        
         return p;
+    }
+
+    private void stopCountdownTimers() {
+        for (Timer timer : countdownTimers) {
+            if (timer != null && timer.isRunning()) {
+                timer.stop();
+            }
+        }
+        countdownTimers.clear();
     }
 
     private void showAnnouncementsBoard() {

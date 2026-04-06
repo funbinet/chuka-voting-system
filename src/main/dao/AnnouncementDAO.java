@@ -64,6 +64,46 @@ public class AnnouncementDAO {
         } catch (SQLException e) { e.printStackTrace(); return false; }
     }
 
+    public int deactivateAllActive() {
+        String sql = "UPDATE announcements SET is_active = FALSE WHERE is_active = TRUE";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    public boolean deleteAnnouncement(int id) {
+        String sql = "DELETE FROM announcements WHERE id = ?";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public int deleteAllAnnouncements() {
+        String sql = "DELETE FROM announcements";
+        try (PreparedStatement ps = getConnection().prepareStatement(sql)) {
+            int affected = ps.executeUpdate();
+
+            // Keep IDs predictable after a full clear.
+            try (PreparedStatement reset = getConnection().prepareStatement("ALTER TABLE announcements AUTO_INCREMENT = 1")) {
+                reset.executeUpdate();
+            } catch (SQLException ignored) {
+                // Not fatal if auto-increment reset is not supported by current engine/settings.
+            }
+
+            return affected;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
     private Announcement mapRow(ResultSet rs) throws SQLException {
         Announcement a = new Announcement();
         a.setId(rs.getInt("id"));

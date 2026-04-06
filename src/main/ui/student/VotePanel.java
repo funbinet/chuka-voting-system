@@ -30,6 +30,8 @@ public class VotePanel extends JPanel {
     }
 
     private void buildUI() {
+        removeAll();
+
         JLabel heading = new JLabel("🗳️ Active Elections — " + student.getFacultyName());
         heading.setFont(Constants.FONT_HEADING);
         heading.setForeground(Constants.COLOR_PRIMARY);
@@ -37,14 +39,22 @@ public class VotePanel extends JPanel {
         add(heading, BorderLayout.NORTH);
 
         electionService.syncElectionStatuses();
-        List<Election> elections = electionService.getActiveElectionsForFaculty(student.getFacultyId());
+        List<Election> activeElections = electionService.getActiveElectionsForFaculty(student.getFacultyId());
+        List<Election> elections = new ArrayList<>();
+        for (Election election : activeElections) {
+            if (isEligibleForElection(election)) {
+                elections.add(election);
+            }
+        }
 
         if (elections.isEmpty()) {
-            JLabel noElec = new JLabel("No active elections for your faculty at this time.");
+            JLabel noElec = new JLabel("No active elections you are eligible to vote in at this time.");
             noElec.setFont(Constants.FONT_BODY);
             noElec.setForeground(Color.GRAY);
             noElec.setHorizontalAlignment(JLabel.CENTER);
             add(noElec, BorderLayout.CENTER);
+            revalidate();
+            repaint();
             return;
         }
 
@@ -58,6 +68,8 @@ public class VotePanel extends JPanel {
         }
 
         add(new JScrollPane(electionsPanel), BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private JPanel buildElectionCard(Election election) {
@@ -84,13 +96,23 @@ public class VotePanel extends JPanel {
         positionsPanel.setLayout(new BoxLayout(positionsPanel, BoxLayout.Y_AXIS));
         positionsPanel.setBackground(Color.WHITE);
 
+        int eligiblePositions = 0;
+
         for (Map.Entry<String, List<Candidate>> entry : byPosition.entrySet()) {
             String positionName = entry.getKey();
-            if (!student.isResident() && (positionName.equals("Male Resident") || positionName.equals("Female Resident"))) {
+            if (!isEligibleForPosition(positionName)) {
                 continue;
             }
+            eligiblePositions++;
             positionsPanel.add(buildPositionSection(election, positionName, entry.getValue()));
             positionsPanel.add(Box.createVerticalStrut(10));
+        }
+
+        if (eligiblePositions == 0) {
+            JLabel empty = new JLabel("No eligible positions in this election for your profile.");
+            empty.setFont(Constants.FONT_BODY);
+            empty.setForeground(Color.GRAY);
+            positionsPanel.add(empty);
         }
 
         card.add(title, BorderLayout.NORTH);
@@ -163,14 +185,8 @@ public class VotePanel extends JPanel {
                 );
                 JOptionPane.showMessageDialog(this, result);
                 if (result.toLowerCase().contains("successfully")) {
-                    voteBtn.setText("✅ Vote Recorded");
-                    voteBtn.setBackground(Constants.COLOR_SUCCESS);
-                    voteBtn.setEnabled(false);
-                    // Disable all cards
-                    for (JPanel p : cardPanels) {
-                        p.setEnabled(false);
-                        for (Component comp : p.getComponents()) comp.setEnabled(false);
-                    }
+                    // Reload all election cards so the student can continue with other eligible elections.
+                    buildUI();
                 }
             }
         });
@@ -189,7 +205,7 @@ public class VotePanel extends JPanel {
     private JPanel createCandidateCard(Candidate c, boolean alreadyVoted) {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setPreferredSize(new Dimension(200, 180));
+        card.setPreferredSize(new Dimension(200, 210));
         card.setBackground(new Color(252, 252, 252));
         card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
         card.setCursor(alreadyVoted ? Cursor.getDefaultCursor() : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -202,6 +218,11 @@ public class VotePanel extends JPanel {
         regLbl.setFont(Constants.FONT_SMALL);
         regLbl.setForeground(Color.GRAY);
         regLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel coalLbl = new JLabel(c.getCoalitionName());
+        coalLbl.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        coalLbl.setForeground(new Color(142, 68, 173));
+        coalLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel yearLbl = new JLabel("Year " + c.getYearOfStudy());
         yearLbl.setFont(Constants.FONT_SMALL);
@@ -228,11 +249,48 @@ public class VotePanel extends JPanel {
         card.add(Box.createVerticalStrut(10));
         card.add(nameLbl);
         card.add(regLbl);
+        card.add(coalLbl);
         card.add(yearLbl);
         card.add(Box.createVerticalStrut(10));
         card.add(viewBtn);
         card.add(Box.createVerticalGlue());
 
         return card;
+    }
+
+    private boolean isEligibleForPosition(String positionName) {
+        String position = positionName == null ? "" : positionName.toLowerCase();
+
+        if (position.contains("female")) {
+            if (!"FEMALE".equalsIgnoreCase(student.getGender())) {
+                return false;
+            }
+        } else if (position.contains("male")) {
+            if (!"MALE".equalsIgnoreCase(student.getGender())) {
+                return false;
+            }
+        }
+
+        if (position.contains("non-resident") || position.contains("non resident")) {
+            return !student.isResident();
+        }
+
+        if (position.contains("resident")) {
+            return student.isResident();
+        }
+
+        return true;
+    }
+
+    private boolean isEligibleForElection(Election election) {
+        if (election == null) {
+            return false;
+        }
+
+        if (election.getFacultyId() > 0 && student.getFacultyId() != election.getFacultyId()) {
+            return false;
+        }
+
+        return isEligibleForPosition(election.getPositionName());
     }
 }

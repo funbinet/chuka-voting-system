@@ -1,6 +1,5 @@
 package main.ui.admin;
 
-import main.dao.StudentDAO;
 import main.models.Candidate;
 import main.models.Election;
 import main.services.ElectionService;
@@ -31,7 +30,6 @@ public class AdminResultsPanel extends JPanel {
 
     private ElectionService electionService;
     private VotingService   votingService;
-    private StudentDAO      studentDAO;
 
     private JComboBox<Election> electionCombo;
     private JPanel chartsContainer;
@@ -40,7 +38,6 @@ public class AdminResultsPanel extends JPanel {
     public AdminResultsPanel() {
         this.electionService = new ElectionService();
         this.votingService   = new VotingService();
-        this.studentDAO      = new StudentDAO();
         
         setBackground(Constants.COLOR_BG);
         setLayout(new BorderLayout());
@@ -122,9 +119,10 @@ public class AdminResultsPanel extends JPanel {
                     voteData.putAll(posResults);
                 }
 
-                int totalEligible = studentDAO.getTotalStudentsByFaculty(election.getFacultyId());
-                
-                ResultsPDFExporter.exportElectionResults(election, candidates, voteData, totalEligible, file);
+                int totalEligible = votingService.getEligibleVoterCount(election);
+                int totalVotesCast = votingService.getTurnout(election.getElectionId());
+
+                ResultsPDFExporter.exportElectionResults(election, candidates, voteData, totalEligible, totalVotesCast, file);
                 
                 JOptionPane.showMessageDialog(this, "✅ PDF Exported Successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException ex) {
@@ -187,7 +185,7 @@ public class AdminResultsPanel extends JPanel {
         panel.setBorder(BorderFactory.createTitledBorder("Voter Turnout Analysis"));
 
         int votedCount = votingService.getTurnout(election.getElectionId());
-        int totalEligible = studentDAO.getTotalStudentsByFaculty(election.getFacultyId());
+        int totalEligible = votingService.getEligibleVoterCount(election);
         int nonVoters = Math.max(0, totalEligible - votedCount);
 
         DefaultPieDataset dataset = new DefaultPieDataset();
@@ -225,7 +223,8 @@ public class AdminResultsPanel extends JPanel {
 
         for (Candidate c : candidates) {
             int votes = results.getOrDefault(c.getApplicationId(), 0);
-            dataset.addValue(votes, "Votes", c.getStudentName());
+            String label = c.getStudentName() + " (" + c.getCoalitionName() + ")";
+            dataset.addValue(votes, "Votes", label);
         }
 
         JFreeChart barChart = ChartFactory.createBarChart(

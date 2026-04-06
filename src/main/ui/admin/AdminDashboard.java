@@ -19,6 +19,7 @@ public class AdminDashboard extends JFrame {
     private JLabel adminLabel;
     private AdminNotificationDAO notificationDAO;
     private Timer notificationTimer;
+    private JPanel mainPanel;
 
     public AdminDashboard(Admin admin) {
         this.admin = admin;
@@ -31,10 +32,47 @@ public class AdminDashboard extends JFrame {
         setTitle("Admin Dashboard — " + admin.getFullName());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1100, 700);
+        setMinimumSize(Constants.MIN_ADMIN_DASHBOARD_SIZE);
         setLocationRelativeTo(null);
 
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        JMenuBar menuBar = new JMenuBar();
+        JMenu menu = new JMenu("Menu");
+        JMenuItem manageElectionsItem = new JMenuItem("Manage Elections");
+        JMenuItem manageStudentsItem = new JMenuItem("Manage Students");
+        JMenuItem manageAnnouncementsItem = new JMenuItem("Manage Announcements");
+        JMenuItem reviewApplicationsItem = new JMenuItem("Review Applications");
+        JMenuItem auditLogsItem = new JMenuItem("Audit Logs");
+        JMenuItem resultsItem = new JMenuItem("View Results");
+        JMenuItem manageCoalitionsItem = new JMenuItem("Manage Coalitions");
+        JMenuItem logoutItem = new JMenuItem("Logout");
+
+        menu.add(manageElectionsItem);
+        menu.add(manageStudentsItem);
+        menu.add(manageAnnouncementsItem);
+        menu.add(reviewApplicationsItem);
+        menu.add(auditLogsItem);
+        menu.add(resultsItem);
+        menu.add(manageCoalitionsItem);
+        menu.add(logoutItem);
+        menuBar.add(menu);
+        setJMenuBar(menuBar);
+
+        mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(Constants.COLOR_BG);
+
+        manageElectionsItem.addActionListener(e -> handleMenu("Elections"));
+        manageStudentsItem.addActionListener(e -> handleMenu("Students"));
+        manageAnnouncementsItem.addActionListener(e -> handleMenu("Announcements"));
+        reviewApplicationsItem.addActionListener(e -> handleMenu("Candidates"));
+        auditLogsItem.addActionListener(e -> handleMenu("Audit"));
+        resultsItem.addActionListener(e -> handleMenu("Results"));
+        manageCoalitionsItem.addActionListener(e -> handleMenu("Coalitions"));
+        logoutItem.addActionListener(e -> {
+            AuthService.logout();
+            stopNotificationPolling();
+            dispose();
+            new RoleSelectionFrame();
+        });
 
         mainPanel.add(buildTopBar(), BorderLayout.NORTH);
         mainPanel.add(buildSidebar(), BorderLayout.WEST);
@@ -43,8 +81,8 @@ public class AdminDashboard extends JFrame {
         contentPanel.setBackground(Constants.COLOR_BG);
         contentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
         showHome();
-
         mainPanel.add(contentPanel, BorderLayout.CENTER);
+
         add(mainPanel);
         setVisible(true);
     }
@@ -79,7 +117,12 @@ public class AdminDashboard extends JFrame {
         logoutBtn.setForeground(Color.WHITE);
         logoutBtn.setFocusPainted(false);
         logoutBtn.setBorderPainted(false);
-        logoutBtn.addActionListener(e -> { AuthService.logout(); dispose(); new RoleSelectionFrame(); });
+        logoutBtn.addActionListener(e -> {
+            AuthService.logout();
+            stopNotificationPolling();
+            dispose();
+            new RoleSelectionFrame();
+        });
 
         JButton refreshBtn = new JButton("🔄 Refresh");
         refreshBtn.setFont(Constants.FONT_SMALL);
@@ -88,6 +131,7 @@ public class AdminDashboard extends JFrame {
         refreshBtn.setFocusPainted(false);
         refreshBtn.setBorderPainted(false);
         refreshBtn.addActionListener(e -> {
+            stopNotificationPolling();
             dispose();
             new AdminDashboard(admin);
         });
@@ -113,6 +157,7 @@ public class AdminDashboard extends JFrame {
             "🏠  Dashboard",
             "🗳️  Manage Elections",
             "👥  Manage Candidates",
+            "🤝  Manage Coalitions",
             "📢  Announcements",
             "📊  View Results",
             "👥  Manage Students",
@@ -142,6 +187,7 @@ public class AdminDashboard extends JFrame {
         if (menu.contains("Dashboard"))           showHome();
         else if (menu.contains("Elections"))      contentPanel.add(new ManageElectionsPanel(admin), BorderLayout.CENTER);
         else if (menu.contains("Candidates"))     contentPanel.add(new ReviewApplicationsPanel(admin), BorderLayout.CENTER);
+        else if (menu.contains("Coalitions"))     contentPanel.add(new ManageCoalitionsPanel(admin), BorderLayout.CENTER);
         else if (menu.contains("Announcements"))  contentPanel.add(new ManageAnnouncementsPanel(admin), BorderLayout.CENTER);
         else if (menu.contains("Results"))        contentPanel.add(new AdminResultsPanel(), BorderLayout.CENTER);
         else if (menu.contains("Students"))       contentPanel.add(new ManageStudentsPanel(), BorderLayout.CENTER);
@@ -151,10 +197,8 @@ public class AdminDashboard extends JFrame {
     }
 
     private void showHome() {
-        JPanel panel = new JPanel(new GridBagLayout());
+        JPanel panel = new JPanel(new BorderLayout(0, 14));
         panel.setBackground(Constants.COLOR_BG);
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridx = 0; gbc.gridy = 0;
 
         JLabel welcome = new JLabel("<html><center>" +
             "<h2 style='color:#1a5276'>Admin Dashboard</h2>" +
@@ -163,16 +207,63 @@ public class AdminDashboard extends JFrame {
         welcome.setFont(Constants.FONT_BODY);
         welcome.setHorizontalAlignment(JLabel.CENTER);
 
-        JPanel cards = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
+        JPanel welcomeRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        welcomeRow.setBackground(Constants.COLOR_BG);
+        welcomeRow.add(welcome);
+
+        GridLayout cardsLayout = new GridLayout(0, 5, 15, 15);
+        JPanel cards = new JPanel(cardsLayout);
         cards.setBackground(Constants.COLOR_BG);
+        cards.setBorder(new EmptyBorder(0, 8, 8, 8));
         cards.add(makeCard("🗳️", "Elections", "Create & manage elections", Constants.COLOR_PRIMARY));
         cards.add(makeCard("👥", "Candidates", "Add & manage candidates", Constants.COLOR_ACCENT));
+        cards.add(makeCard("🤝", "Coalitions", "Manage parties & coalitions", new Color(142, 68, 173)));
         cards.add(makeCard("📊", "Results", "View live vote counts", Constants.COLOR_SUCCESS));
         cards.add(makeCard("👥", "Students", "Manage student records", Constants.COLOR_SECONDARY));
+        cards.add(makeCard("📋", "Audit Logs", "Track system activities", new Color(52, 73, 94)));
 
-        gbc.gridy = 0; panel.add(welcome, gbc);
-        gbc.gridy = 1; panel.add(cards, gbc);
+        JPanel cardsContainer = new JPanel(new BorderLayout());
+        cardsContainer.setBackground(Constants.COLOR_BG);
+        cardsContainer.add(cards, BorderLayout.NORTH);
+
+        JScrollPane cardsScroll = new JScrollPane(cardsContainer);
+        cardsScroll.setBorder(BorderFactory.createEmptyBorder());
+        cardsScroll.getViewport().setBackground(Constants.COLOR_BG);
+        cardsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        cardsScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+        cardsScroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                adjustHomeCardsLayout(cardsLayout, cardsScroll.getViewport().getWidth(), cards);
+            }
+        });
+        SwingUtilities.invokeLater(() -> adjustHomeCardsLayout(cardsLayout, cardsScroll.getViewport().getWidth(), cards));
+
+        panel.add(welcomeRow, BorderLayout.NORTH);
+        panel.add(cardsScroll, BorderLayout.CENTER);
         contentPanel.add(panel, BorderLayout.CENTER);
+    }
+
+    private void adjustHomeCardsLayout(GridLayout layout, int availableWidth, JPanel cardsPanel) {
+        int columns;
+        if (availableWidth >= 1320) {
+            columns = 6;
+        } else if (availableWidth >= 1020) {
+            columns = 4;
+        } else if (availableWidth >= 760) {
+            columns = 3;
+        } else if (availableWidth >= 520) {
+            columns = 2;
+        } else {
+            columns = 1;
+        }
+
+        if (layout.getColumns() != columns) {
+            layout.setColumns(columns);
+            cardsPanel.revalidate();
+            cardsPanel.repaint();
+        }
     }
 
     private JPanel makeCard(String icon, String title, String desc, Color color) {
@@ -223,6 +314,13 @@ public class AdminDashboard extends JFrame {
             }
         });
         notificationTimer.start();
+    }
+
+    private void stopNotificationPolling() {
+        if (notificationTimer != null) {
+            notificationTimer.stop();
+            notificationTimer = null;
+        }
     }
 
     private void showNotificationsDialog() {

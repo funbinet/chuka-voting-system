@@ -80,7 +80,7 @@ public class ResultsViewPanel extends JPanel {
     }
 
     private JScrollPane buildElectionTable(Election election) {
-        String[] columns = {"Position", "Candidate Name", "Total Votes", "Vote %", "Rank"};
+        String[] columns = {"Position", "Candidate Name", "Coalition", "Total Votes", "Vote %", "Rank"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) { return false; }
@@ -104,7 +104,7 @@ public class ResultsViewPanel extends JPanel {
             for (Candidate c : sortedCands) {
                 int count = votes.getOrDefault(c.getApplicationId(), 0);
                 int pct = totalVotes == 0 ? 0 : (count * 100 / totalVotes);
-                model.addRow(new Object[]{ position, c.getStudentName(), count, pct + "%", rank });
+                model.addRow(new Object[]{ position, c.getStudentName(), c.getCoalitionName(), count, pct + "%", rank });
                 rank++;
             }
         }
@@ -122,7 +122,7 @@ public class ResultsViewPanel extends JPanel {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
                 Component c = super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, col);
-                int rankVal = (int) t.getModel().getValueAt(t.convertRowIndexToModel(row), 4);
+                int rankVal = (int) t.getModel().getValueAt(t.convertRowIndexToModel(row), 5);
                 if (rankVal == 1) {
                     c.setFont(new Font("Segoe UI", Font.BOLD, 14));
                     c.setForeground(new Color(40, 167, 69)); // Success Emerald Green
@@ -131,7 +131,7 @@ public class ResultsViewPanel extends JPanel {
                     c.setForeground(Constants.COLOR_TEXT);
                 }
                 
-                if (col == 4) {
+                if (col == 5) {
                     ((JLabel) c).setHorizontalAlignment(JLabel.CENTER);
                 } else {
                     ((JLabel) c).setHorizontalAlignment(JLabel.LEFT);

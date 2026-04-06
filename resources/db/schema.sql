@@ -51,6 +51,13 @@ CREATE TABLE admins (
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE coalitions (
+    coalition_id INT PRIMARY KEY AUTO_INCREMENT,
+    name         VARCHAR(100) NOT NULL UNIQUE,
+    motto        VARCHAR(255),
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE candidate_applications (
     application_id   INT PRIMARY KEY AUTO_INCREMENT,
     student_id       INT          NOT NULL,
@@ -62,9 +69,11 @@ CREATE TABLE candidate_applications (
     applied_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     reviewed_at      TIMESTAMP    NULL,
     reviewed_by      INT,
+    coalition_id     INT,
     FOREIGN KEY (student_id)  REFERENCES students(student_id),
     FOREIGN KEY (position_id) REFERENCES positions(position_id),
     FOREIGN KEY (reviewed_by) REFERENCES admins(admin_id),
+    FOREIGN KEY (coalition_id) REFERENCES coalitions(coalition_id) ON DELETE SET NULL,
     UNIQUE KEY unique_application (student_id, position_id)
 );
 
@@ -167,17 +176,17 @@ INSERT INTO faculties (faculty_code, faculty_name) VALUES
 -- Sample Students (Password: Student@123)
 -- Hash: 5ea99453f4712f50a409c7177a8e0436da4352a8e830b037f2ba0966320b6900
 -- Salt: AAAAAAAAAAAAAAAAAAAAAA==
-INSERT INTO students (reg_number, full_name, email, phone_number, password_hash, password_salt, faculty_id, year_of_study, gpa, gender, is_verified, password_changed) VALUES
-('EB1/66840/23', 'John Doe', 'john.doe@chuka.ac.ke', '0711111111', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.50, 'MALE', TRUE, FALSE),
-('CS1/12345/22', 'Alice Smith', 'alice.smith@chuka.ac.ke', '0722222222', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.85, 'FEMALE', TRUE, FALSE),
-('BE1/55443/23', 'Bob Johnson', 'bob.johnson@chuka.ac.ke', '0733333333', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.20, 'MALE', TRUE, FALSE),
-('HS1/99887/21', 'Catherine Mwangi', 'catherine.m@chuka.ac.ke', '0744444444', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.90, 'FEMALE', TRUE, FALSE),
-('ED1/11223/22', 'David Omondi', 'david.o@chuka.ac.ke', '0755555555', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.45, 'MALE', TRUE, FALSE),
-('EB1/77665/23', 'Eve Wambui', 'eve.w@chuka.ac.ke', '0766666666', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.10, 'FEMALE', TRUE, FALSE),
-('CS1/88990/22', 'Franklin Mutua', 'franklin.m@chuka.ac.ke', '0777777777', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.65, 'MALE', TRUE, FALSE),
-('BE1/44332/23', 'Grace Atieno', 'grace.a@chuka.ac.ke', '0788888888', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.75, 'FEMALE', TRUE, FALSE),
-('HS1/22334/21', 'Henry Kiprotich', 'henry.k@chuka.ac.ke', '0799999999', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.30, 'MALE', TRUE, FALSE),
-('ED1/55667/22', 'Irene Nyambura', 'irene.n@chuka.ac.ke', '0700112233', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.55, 'FEMALE', TRUE, FALSE);
+INSERT INTO students (reg_number, full_name, email, phone_number, password_hash, password_salt, faculty_id, year_of_study, gpa, gender, is_resident, is_verified, password_changed) VALUES
+('EB1/66840/23', 'John Doe', 'john.doe@chuka.ac.ke', '0711111111', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.50, 'MALE', TRUE, TRUE, FALSE),
+('CS1/12345/22', 'Alice Smith', 'alice.smith@chuka.ac.ke', '0722222222', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.85, 'FEMALE', FALSE, TRUE, FALSE),
+('BE1/55443/23', 'Bob Johnson', 'bob.johnson@chuka.ac.ke', '0733333333', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.20, 'MALE', TRUE, TRUE, FALSE),
+('HS1/99887/21', 'Catherine Mwangi', 'catherine.m@chuka.ac.ke', '0744444444', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.90, 'FEMALE', TRUE, TRUE, FALSE),
+('ED1/11223/22', 'David Omondi', 'david.o@chuka.ac.ke', '0755555555', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.45, 'MALE', FALSE, TRUE, FALSE),
+('EB1/77665/23', 'Eve Wambui', 'eve.w@chuka.ac.ke', '0766666666', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 1, 2, 3.10, 'FEMALE', FALSE, TRUE, FALSE),
+('CS1/88990/22', 'Franklin Mutua', 'franklin.m@chuka.ac.ke', '0777777777', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 5, 3, 3.65, 'MALE', TRUE, TRUE, FALSE),
+('BE1/44332/23', 'Grace Atieno', 'grace.a@chuka.ac.ke', '0788888888', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 2, 1, 3.75, 'FEMALE', TRUE, TRUE, FALSE),
+('HS1/22334/21', 'Henry Kiprotich', 'henry.k@chuka.ac.ke', '0799999999', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 3, 4, 3.30, 'MALE', FALSE, TRUE, FALSE),
+('ED1/55667/22', 'Irene Nyambura', 'irene.n@chuka.ac.ke', '0700112233', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff', 'AAAAAAAAAAAAAAAAAAAAAA==', 4, 3, 3.55, 'FEMALE', FALSE, TRUE, FALSE);
 
 INSERT INTO admins (full_name, email, phone_number, password_hash, password_salt) VALUES
 ('System Admin', 'admin@chuka.ac.ke', '0700000000', '55c7d632829e209bda2099d7d045e331f811276c69d2196add304e72a75070ff',
@@ -188,9 +197,8 @@ INSERT INTO admins (full_name, email, phone_number, password_hash, password_salt
 -- ============================================================
 INSERT INTO positions (position_id, position_name, faculty_id) VALUES
 (101, 'Faculty Chairman', NULL),
-(102, 'Faculty Secretary', NULL),
-(103, 'Faculty Treasurer', NULL),
-(104, 'Female Resident', NULL),
-(105, 'Male Resident', NULL),
-(106, 'Female Non-Resident', NULL),
-(107, 'Male Non-Resident', NULL);
+(104, 'Female Resident Representative', NULL),
+(105, 'Male Resident Representative', NULL),
+(106, 'Female Non-Resident Representative', NULL),
+(107, 'Male Non-Resident Representative', NULL);
+

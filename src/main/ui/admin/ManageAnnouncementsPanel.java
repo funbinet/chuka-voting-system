@@ -18,63 +18,114 @@ public class ManageAnnouncementsPanel extends JPanel {
     private JTable          table;
     private DefaultTableModel tableModel;
     private Admin           currentAdmin;
+    private JTextField      searchField;
 
     public ManageAnnouncementsPanel(Admin admin) {
         this.currentAdmin = admin;
         this.announcementDAO = new AnnouncementDAO();
         setBackground(Constants.COLOR_BG);
         setLayout(new BorderLayout());
-        setBorder(new EmptyBorder(20, 20, 20, 20));
+        setBorder(new EmptyBorder(10, 10, 10, 10));
         initUI();
-        refreshData();
+        refreshData("");
     }
 
     private void initUI() {
-        JPanel topPanel = new JPanel(new BorderLayout());
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
         topPanel.setBackground(Constants.COLOR_BG);
-        topPanel.setBorder(new EmptyBorder(0, 0, 15, 0));
+        topPanel.setBorder(new EmptyBorder(0, 0, 12, 0));
 
         JLabel title = new JLabel("📢 Manage Announcements");
         title.setFont(Constants.FONT_HEADING);
         title.setForeground(Constants.COLOR_PRIMARY);
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        actions.setBackground(Constants.COLOR_BG);
+        JPanel headingRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        headingRow.setBackground(Constants.COLOR_BG);
+        headingRow.add(title);
 
-        JButton addBtn = createBtn("Add New", Constants.COLOR_SUCCESS);
+        searchField = new JTextField(26);
+        searchField.setFont(Constants.FONT_BODY);
+
+        JButton searchBtn = createBtn("🔍 Search", Constants.COLOR_SECONDARY);
+        searchBtn.addActionListener(e -> refreshData(searchField.getText().trim()));
+
+        JButton refreshBtn = createBtn("↺ Refresh", Constants.COLOR_PRIMARY);
+        refreshBtn.addActionListener(e -> {
+            searchField.setText("");
+            refreshData("");
+        });
+
+        searchField.addActionListener(e -> refreshData(searchField.getText().trim()));
+
+        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        searchRow.setBackground(Constants.COLOR_BG);
+        searchRow.add(new JLabel("Search:"));
+        searchRow.add(searchField);
+        searchRow.add(searchBtn);
+        searchRow.add(refreshBtn);
+
+        topPanel.add(headingRow);
+        topPanel.add(Box.createVerticalStrut(8));
+        topPanel.add(searchRow);
+
+        JButton addBtn = createBtn("➕ Add Announcement", Constants.COLOR_PRIMARY);
         addBtn.addActionListener(e -> showAddDialog());
 
-        JButton deactivateBtn = createBtn("Deactivate", Constants.COLOR_DANGER);
-        deactivateBtn.addActionListener(e -> handleDeactivate());
+        JButton deleteBtn = createBtn("🗑️ Delete Announcement", Constants.COLOR_DANGER);
+        deleteBtn.addActionListener(e -> handleDelete());
 
-        actions.add(addBtn);
-        actions.add(deactivateBtn);
+        JButton clearAllBtn = createBtn("🧹 Clear All Announcements", Constants.COLOR_SUCCESS);
+        clearAllBtn.addActionListener(e -> clearAllAnnouncements());
 
-        topPanel.add(title, BorderLayout.WEST);
-        topPanel.add(actions, BorderLayout.EAST);
+        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 8));
+        actionBar.setBackground(Constants.COLOR_BG);
+        actionBar.setBorder(new EmptyBorder(10, 0, 0, 0));
+        actionBar.add(addBtn);
+        actionBar.add(deleteBtn);
+        actionBar.add(clearAllBtn);
 
-        String[] cols = {"ID", "Title", "Posted By", "Date", "Status"};
+        String[] cols = {"ID", "Title", "Posted By", "Date"};
         tableModel = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(tableModel);
         table.setRowHeight(30);
+        table.setFont(Constants.FONT_BODY);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.getTableHeader().setFont(Constants.FONT_BUTTON);
+        table.getTableHeader().setBackground(Constants.COLOR_PRIMARY);
+        table.getTableHeader().setForeground(Color.WHITE);
 
         add(topPanel, BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
+        add(actionBar, BorderLayout.SOUTH);
     }
 
     private void refreshData() {
+        refreshData(searchField != null ? searchField.getText().trim() : "");
+    }
+
+    private void refreshData(String search) {
         tableModel.setRowCount(0);
         List<Announcement> list = announcementDAO.getAll();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        String term = search == null ? "" : search.trim().toLowerCase();
         for (Announcement a : list) {
+            if (!term.isEmpty()) {
+                String title = a.getTitle() == null ? "" : a.getTitle().toLowerCase();
+                String admin = a.getAdminName() == null ? "" : a.getAdminName().toLowerCase();
+                String date = a.getPostedAt() == null ? "" : sdf.format(a.getPostedAt()).toLowerCase();
+                if (!(title.contains(term) || admin.contains(term) || date.contains(term))) {
+                    continue;
+                }
+            }
+
             tableModel.addRow(new Object[]{
                 a.getId(),
                 a.getTitle(),
                 a.getAdminName(),
-                sdf.format(a.getPostedAt()),
-                a.isActive() ? "Active" : "Inactive"
+                sdf.format(a.getPostedAt())
             });
         }
     }
@@ -86,19 +137,64 @@ public class ManageAnnouncementsPanel extends JPanel {
 
         int option = JOptionPane.showConfirmDialog(this, message, "New Announcement", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION) {
-            if (announcementDAO.createAnnouncement(currentAdmin.getAdminId(), tField.getText(), bArea.getText())) {
+            String title = tField.getText() == null ? "" : tField.getText().trim();
+            String body = bArea.getText() == null ? "" : bArea.getText().trim();
+
+            if (title.isEmpty() || body.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Title and body are required.", "Validation", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (announcementDAO.createAnnouncement(currentAdmin.getAdminId(), title, body)) {
                 refreshData();
+            } else {
+                JOptionPane.showMessageDialog(this, "Failed to create announcement.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
-    private void handleDeactivate() {
+    private void handleDelete() {
         int row = table.getSelectedRow();
-        if (row == -1) return;
-        int id = (int) tableModel.getValueAt(row, 0);
-        if (announcementDAO.deactivate(id)) {
-            refreshData();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Please select an announcement to delete.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            return;
         }
+
+        int id = (int) tableModel.getValueAt(row, 0);
+        String title = String.valueOf(tableModel.getValueAt(row, 1));
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Delete announcement '" + title + "'?",
+                "Confirm Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        if (announcementDAO.deleteAnnouncement(id)) {
+            refreshData();
+        } else {
+            JOptionPane.showMessageDialog(this, "Failed to delete announcement.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void clearAllAnnouncements() {
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+            "Delete ALL announcements (active and inactive)?",
+                "Confirm Clear All",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        int affected = announcementDAO.deleteAllAnnouncements();
+        JOptionPane.showMessageDialog(this, "Deleted " + affected + " announcements.", "Done", JOptionPane.INFORMATION_MESSAGE);
+        refreshData();
     }
 
     private JButton createBtn(String text, Color bg) {

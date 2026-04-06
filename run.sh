@@ -1,12 +1,24 @@
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
+
+compose_cmd() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    elif docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    else
+        echo "❌ Docker Compose not found. Install docker-compose or Docker Compose plugin."
+        return 1
+    fi
+}
 
 # System Requirements Check
 check_dependencies() {
     echo "🔍 Checking system dependencies..."
 
     # 1. Java JDK Check
-    if ! command -v java >/dev/null 2>&1; then
-        echo "❌ Java is missing."
+    if ! command -v java >/dev/null 2>&1 || ! command -v javac >/dev/null 2>&1; then
+        echo "❌ Java JDK is missing (java/javac not found)."
         if command -v apt-get >/dev/null 2>&1; then
             echo "Attempting to install OpenJDK 17 via apt..."
             sudo apt-get update && sudo apt-get install -y openjdk-17-jdk
@@ -32,6 +44,12 @@ check_dependencies() {
             show_manual_docker_guide
             exit 1
         fi
+    fi
+
+    if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+        echo "❌ Docker Compose not found (neither docker-compose nor docker compose plugin available)."
+        show_manual_docker_guide
+        exit 1
     fi
 
     # 3. Port Check (3308)
@@ -65,6 +83,11 @@ show_manual_docker_guide() {
 
 solve_port_conflict() {
     local PORT=3308
+    if ! command -v lsof >/dev/null 2>&1; then
+        echo "⚠️  'lsof' not found; skipping automatic port $PORT conflict detection."
+        return
+    fi
+
     local PID=$(lsof -Pi :$PORT -sTCP:LISTEN -t)
     
     if [ -n "$PID" ]; then
@@ -107,22 +130,50 @@ compile() {
     rm -rf "$OUT_DIR"
     mkdir -p "$OUT_DIR"
 
-    # Find all .java files
-    find "$SRC_DIR" -name "*.java" > /tmp/chuka_sources.txt
+    # Find all .java files and store in a local file for transparency
+    find "$SRC_DIR" -name "*.java" > sources.txt
 
     # Compile with all library JARs on classpath
-    javac -cp "$CLASSPATH" -d "$OUT_DIR" @/tmp/chuka_sources.txt
+    if javac -cp "$CLASSPATH" -d "$OUT_DIR" @sources.txt; then
+        echo "✅ Compilation successful!"
+        rm sources.txt
 
-    # Copy resources
-    if [ -d "$RES_DIR" ]; then
-        cp -r "$RES_DIR"/* "$OUT_DIR/" 2>/dev/null || true
+        # Copy resources
+        if [ -d "$RES_DIR" ]; then
+            cp -r "$RES_DIR"/* "$OUT_DIR/" 2>/dev/null || true
+        fi
+    else
+        echo "❌ Compilation failed!"
+        rm sources.txt
+        exit 1
     fi
+}
 
-    echo "Compilation successful!"
+wait_for_database() {
+    local host="${DB_HOST:-localhost}"
+    local port="${DB_PORT:-3308}"
+    local max_attempts=30
+
+    echo "Waiting for database to be reachable at $host:$port..."
+    for ((i=1; i<=max_attempts; i++)); do
+        if (echo >"/dev/tcp/$host/$port") >/dev/null 2>&1; then
+            echo "✅ Database is reachable."
+            return 0
+        fi
+        sleep 2
+    done
+
+    echo "❌ Database is not reachable after $((max_attempts * 2)) seconds."
+    return 1
 }
 
 run_app() {
     echo "Starting Chuka University Voting System..."
+
+    if [ ! -f "$OUT_DIR/main/Main.class" ]; then
+        echo "No compiled classes found. Running compile first..."
+        compile
+    fi
     
     # Set DB connection via environment variables (defaults work with docker-compose)
     export DB_HOST="${DB_HOST:-localhost}"
@@ -143,20 +194,14 @@ case "${1:-all}" in
         ;;
     setup)
         check_dependencies
-        docker-compose up -d
+        compose_cmd up -d
+        wait_for_database
         echo "Environment is ready."
         ;;
     all|*)
         check_dependencies
-        # Ensure DB is up
-        if command -v docker-compose >/dev/null 2>&1; then
-            docker-compose up -d
-        elif docker compose version >/dev/null 2>&1; then
-            docker compose up -d
-        fi
-        
-        echo "Waiting for database to initialize (10s)..."
-        sleep 10
+        compose_cmd up -d
+        wait_for_database
         
         compile
         run_app
