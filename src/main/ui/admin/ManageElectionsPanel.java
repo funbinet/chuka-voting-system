@@ -6,6 +6,7 @@ import main.models.Election;
 import main.models.Faculty;
 import main.services.ElectionService;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -22,6 +23,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -563,25 +565,52 @@ public class ManageElectionsPanel extends JPanel {
     }
 
     private void loadPositionsIntoCombo(JComboBox<PositionItem> combo) {
+        combo.removeAllItems();
+        Map<PositionRules.PositionCategory, PositionItem> canonicalPositions =
+                new EnumMap<>(PositionRules.PositionCategory.class);
+
         try (Connection conn = DBConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT * FROM positions WHERE faculty_id IS NULL ORDER BY position_name ASC")) {
+             PreparedStatement ps = conn.prepareStatement("SELECT position_id, position_name, faculty_id FROM positions ORDER BY position_id ASC")) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                combo.addItem(new PositionItem(
+                PositionRules.PositionCategory category = PositionRules.classify(rs.getString("position_name"));
+                if (!PositionRules.isCanonical(category)) {
+                    continue;
+                }
+
+                int facultyId = rs.getObject("faculty_id") == null ? 0 : rs.getInt("faculty_id");
+                PositionItem candidate = new PositionItem(
                     rs.getInt("position_id"),
-                    rs.getString("position_name"),
-                    0
-                ));
+                    PositionRules.canonicalLabel(category),
+                    facultyId
+                );
+
+                PositionItem existing = canonicalPositions.get(category);
+                if (shouldPreferPosition(candidate, existing)) {
+                    canonicalPositions.put(category, candidate);
+                }
+            }
+
+            for (PositionRules.PositionCategory category : PositionRules.CANONICAL_ORDER) {
+                PositionItem option = canonicalPositions.get(category);
+                if (option != null) {
+                    combo.addItem(option);
+                }
             }
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    private Faculty findFacultyById(int id, JComboBox<Faculty> combo) {
-        for (int i = 0; i < combo.getItemCount(); i++) {
-            Faculty f = combo.getItemAt(i);
-            if (f.getFacultyId() == id) return f;
+    private boolean shouldPreferPosition(PositionItem candidate, PositionItem existing) {
+        if (existing == null) {
+            return true;
         }
-        return null;
+        if (candidate.getFacultyId() == 0 && existing.getFacultyId() > 0) {
+            return true;
+        }
+        if (candidate.getFacultyId() > 0 && existing.getFacultyId() == 0) {
+            return false;
+        }
+        return candidate.getId() < existing.getId();
     }
 
     private static class PositionItem {

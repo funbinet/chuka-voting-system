@@ -3,6 +3,7 @@ package main.ui.student;
 import main.dao.AnnouncementDAO;
 import main.models.Announcement;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -14,6 +15,7 @@ public class AnnouncementsBoard extends JPanel {
 
     private AnnouncementDAO announcementDAO;
     private JPanel          listPanel;
+    private Timer           autoRefreshTimer;
 
     public AnnouncementsBoard() {
         this.announcementDAO = new AnnouncementDAO();
@@ -22,14 +24,30 @@ public class AnnouncementsBoard extends JPanel {
         setBorder(new EmptyBorder(10, 10, 10, 10));
         initUI();
         refreshData();
+        startAutoRefresh();
     }
 
     private void initUI() {
+        JPanel topBar = new JPanel(new BorderLayout());
+        topBar.setBackground(Constants.COLOR_BG);
+
         JLabel heading = new JLabel("📢 Announcements & News");
         heading.setFont(Constants.FONT_HEADING);
         heading.setForeground(Constants.COLOR_PRIMARY);
-        heading.setBorder(new EmptyBorder(0, 0, 15, 0));
-        add(heading, BorderLayout.NORTH);
+        heading.setBorder(new EmptyBorder(0, 0, 0, 0));
+
+        JButton refreshBtn = new JButton("Refresh");
+        refreshBtn.setFont(Constants.FONT_SMALL);
+        refreshBtn.setBackground(Constants.COLOR_SECONDARY);
+        refreshBtn.setForeground(Color.WHITE);
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setBorderPainted(false);
+        refreshBtn.addActionListener(e -> refreshData());
+
+        topBar.setBorder(new EmptyBorder(0, 0, 15, 0));
+        topBar.add(heading, BorderLayout.WEST);
+        topBar.add(refreshBtn, BorderLayout.EAST);
+        add(topBar, BorderLayout.NORTH);
 
         listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
@@ -51,9 +69,12 @@ public class AnnouncementsBoard extends JPanel {
             main.services.ElectionService elecService = new main.services.ElectionService();
             main.models.Student stu = main.services.AuthService.getCurrentStudent();
             if (stu != null) {
-                // Fetch active elections from all faculties globally
+                // Fetch active elections and show only those relevant to the logged-in student.
                 List<main.models.Election> activeElections = elecService.getAllActiveElections();
                 for (main.models.Election e : activeElections) {
+                    if (!isVisibleToStudent(stu, e)) {
+                        continue;
+                    }
                     listPanel.add(buildLiveResultsCard(e));
                     listPanel.add(Box.createVerticalStrut(15));
                     hasItems = true;
@@ -80,6 +101,40 @@ public class AnnouncementsBoard extends JPanel {
 
         listPanel.revalidate();
         listPanel.repaint();
+    }
+
+    private boolean isVisibleToStudent(main.models.Student student, main.models.Election election) {
+        if (election.getFacultyId() > 0 && election.getFacultyId() != student.getFacultyId()) {
+            return false;
+        }
+
+        PositionRules.PositionCategory category = PositionRules.classify(election.getPositionName());
+        if (!PositionRules.isCanonical(category)) {
+            return true;
+        }
+
+        return PositionRules.isGenderEligible(student.getGender(), category)
+                && PositionRules.isResidencyEligible(student.isResident(), category);
+    }
+
+    private void startAutoRefresh() {
+        if (autoRefreshTimer != null && autoRefreshTimer.isRunning()) {
+            return;
+        }
+        autoRefreshTimer = new Timer(20000, e -> refreshData());
+        autoRefreshTimer.start();
+    }
+
+    private void stopAutoRefresh() {
+        if (autoRefreshTimer != null) {
+            autoRefreshTimer.stop();
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        stopAutoRefresh();
+        super.removeNotify();
     }
 
     private JPanel buildLiveResultsCard(main.models.Election e) {

@@ -14,8 +14,8 @@ public class AnnouncementDAO {
 
     public List<Announcement> getAllActive() {
         List<Announcement> list = new ArrayList<>();
-        String sql = "SELECT a.*, adm.full_name FROM announcements a " +
-                     "JOIN admins adm ON a.posted_by = adm.admin_id " +
+        String sql = "SELECT a.*, COALESCE(adm.full_name, 'System Admin') AS full_name FROM announcements a " +
+                     "LEFT JOIN admins adm ON a.posted_by = adm.admin_id " +
                      "WHERE a.is_active = TRUE ORDER BY a.posted_at DESC";
         try (Statement st = getConnection().createStatement();
              ResultSet rs = st.executeQuery(sql)) {
@@ -26,8 +26,8 @@ public class AnnouncementDAO {
 
     public List<Announcement> getAll() {
         List<Announcement> list = new ArrayList<>();
-        String sql = "SELECT a.*, adm.full_name FROM announcements a " +
-                     "JOIN admins adm ON a.posted_by = adm.admin_id " +
+        String sql = "SELECT a.*, COALESCE(adm.full_name, 'System Admin') AS full_name FROM announcements a " +
+                     "LEFT JOIN admins adm ON a.posted_by = adm.admin_id " +
                      "ORDER BY a.posted_at DESC";
         try (Statement st = getConnection().createStatement();
              ResultSet rs = st.executeQuery(sql)) {

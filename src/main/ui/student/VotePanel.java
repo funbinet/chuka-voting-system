@@ -6,6 +6,7 @@ import main.models.Student;
 import main.services.ElectionService;
 import main.services.VotingService;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -259,27 +260,12 @@ public class VotePanel extends JPanel {
     }
 
     private boolean isEligibleForPosition(String positionName) {
-        String position = positionName == null ? "" : positionName.toLowerCase();
-
-        if (position.contains("female")) {
-            if (!"FEMALE".equalsIgnoreCase(student.getGender())) {
-                return false;
-            }
-        } else if (position.contains("male")) {
-            if (!"MALE".equalsIgnoreCase(student.getGender())) {
-                return false;
-            }
+        PositionRules.PositionCategory category = PositionRules.classify(positionName);
+        if (!PositionRules.isCanonical(category)) {
+            return true;
         }
-
-        if (position.contains("non-resident") || position.contains("non resident")) {
-            return !student.isResident();
-        }
-
-        if (position.contains("resident")) {
-            return student.isResident();
-        }
-
-        return true;
+        return PositionRules.isGenderEligible(student.getGender(), category)
+                && PositionRules.isResidencyEligible(student.isResident(), category);
     }
 
     private boolean isEligibleForElection(Election election) {

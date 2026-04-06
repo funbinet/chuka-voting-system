@@ -6,6 +6,7 @@ import main.dao.StudentDAO;
 import main.models.Candidate;
 import main.models.Student;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import java.util.List;
 
@@ -34,9 +35,6 @@ public class CandidateService {
             return lastMessage;
         }
 
-        // Canonical Positions support:
-        // If the position is faculty-tied (Chairman, Secretary, Treasurer), 
-        // we implicitly use the student's own faculty in this modular design.
         String posName = "";
         try (java.sql.Connection conn = main.dao.DBConnection.getInstance().getConnection();
              java.sql.PreparedStatement ps = conn.prepareStatement("SELECT position_name FROM positions WHERE position_id=?")) {
@@ -44,12 +42,7 @@ public class CandidateService {
             java.sql.ResultSet rs = ps.executeQuery();
             if (rs.next()) posName = rs.getString("position_name").toLowerCase();
         } catch (java.sql.SQLException e) { e.printStackTrace(); }
-
-        if (posName.contains("faculty")) {
-            // For faculty positions, the candidate must belong to a faculty (which they do)
-            // Existing logic checked positionFacultyId == student.getFacultyId()
-            // But now positions have faculty_id = NULL. So we just assume it's for the student's faculty.
-        }
+        PositionRules.PositionCategory category = PositionRules.classify(posName);
 
         if (candidateDAO.hasAnyActiveApplication(student.getStudentId())) {
             lastMessage = "This student is already a candidate in the system.";
@@ -79,7 +72,10 @@ public class CandidateService {
 
         boolean approved = candidateDAO.approveApplication(applicationId, adminId);
         if (approved) {
-            int targetElectionId = candidateDAO.getTargetElectionId(student.getFacultyId(), positionId);
+            Integer targetFacultyId = category == PositionRules.PositionCategory.FACULTY_CHAIRMAN
+                    ? student.getFacultyId()
+                    : null;
+            int targetElectionId = candidateDAO.getTargetElectionId(targetFacultyId, positionId);
             if (targetElectionId != -1) {
                 candidateDAO.addCandidateToElection(targetElectionId, applicationId);
                 lastMessage = "Candidate added and approved for the upcoming election successfully.";
@@ -102,45 +98,37 @@ public class CandidateService {
             return false;
         }
 
-        // Validate generic/position-specific rules
-        String posName = position.getPositionName().toLowerCase();
-
-        // 1. Faculty validation
-        // Null or 0 faculty means it's a cross-faculty role (e.g. Male Resident) according to schema
-        if (position.getFacultyId() > 0) {
-            if (position.getFacultyId() != student.getFacultyId()) {
-                lastMessage = "You cannot apply for a position outside your faculty.";
-                return false;
-            }
+        if (!validateStudentBaselineEligibility(student)) {
+            return false;
         }
 
-        // 2. Gender validation
-        if (posName.contains("male") && !posName.contains("female")) {
-            if (!"MALE".equalsIgnoreCase(student.getGender())) {
-                lastMessage = "This position is strictly for male candidates.";
-                return false;
-            }
-        } else if (posName.contains("female")) {
-            if (!"FEMALE".equalsIgnoreCase(student.getGender())) {
-                lastMessage = "This position is strictly for female candidates.";
-                return false;
-            }
+        PositionRules.PositionCategory category = PositionRules.classify(position.getPositionName());
+        if (!PositionRules.isCanonical(category)) {
+            lastMessage = "Unsupported position mapping detected. Please contact an administrator to refresh the position setup.";
+            return false;
         }
 
-        // 3. Residency validation
-        if (posName.contains("non-resident") || posName.contains("non resident")) {
-            if (student.isResident()) {
-                lastMessage = "This position is strictly for non-resident candidates.";
-                return false;
-            }
-        } else if (posName.contains("resident") && !posName.contains("non")) {
-            if (!student.isResident()) {
-                lastMessage = "This position is strictly for resident candidates.";
-                return false;
-            }
+        position.setPositionName(PositionRules.canonicalLabel(category));
+
+        if (category == PositionRules.PositionCategory.FACULTY_CHAIRMAN && student.getFacultyId() <= 0) {
+            lastMessage = "Your profile has no faculty assigned. Please contact an administrator before applying for Faculty Chairman.";
+            return false;
         }
 
-        // 4. Duplicate checks
+        if (!PositionRules.isGenderEligible(student.getGender(), category)) {
+            lastMessage = "You cannot apply for " + position.getPositionName() + ". Required gender: "
+                    + PositionRules.requiredGender(category) + ". Your profile gender: "
+                    + PositionRules.displayGender(student.getGender()) + ".";
+            return false;
+        }
+
+        if (!PositionRules.isResidencyEligible(student.isResident(), category)) {
+            lastMessage = "You cannot apply for " + position.getPositionName() + ". Required residency: "
+                    + PositionRules.requiredResidencyLabel(category) + ". Your profile residency: "
+                    + PositionRules.profileResidencyLabel(student.isResident()) + ".";
+            return false;
+        }
+
         if (candidateDAO.hasAnyActiveApplication(studentId)) {
             lastMessage = "You already have an active application.";
             return false;
@@ -169,8 +157,15 @@ public class CandidateService {
         boolean approved = candidateDAO.approveApplication(applicationId, adminId);
         if (approved) {
             Candidate app = candidateDAO.findById(applicationId);
+            Integer electionScopeFacultyId = null;
+            if (app != null) {
+                PositionRules.PositionCategory category = PositionRules.classify(app.getPositionName());
+                electionScopeFacultyId = category == PositionRules.PositionCategory.FACULTY_CHAIRMAN
+                        ? app.getFacultyId()
+                        : null;
+            }
             int targetElectionId = (app != null)
-                    ? candidateDAO.getTargetElectionId(facultyId, app.getPositionId())
+                    ? candidateDAO.getTargetElectionId(electionScopeFacultyId, app.getPositionId())
                     : candidateDAO.getTargetElectionId(facultyId);
             if (targetElectionId != -1) {
                 candidateDAO.addCandidateToElection(targetElectionId, applicationId);
@@ -252,5 +247,26 @@ public class CandidateService {
             return null;
         }
         return coalitionDAO.existsById(coalitionId) ? coalitionId : null;
+    }
+
+    private boolean validateStudentBaselineEligibility(Student student) {
+        if (!student.isActive()) {
+            lastMessage = "Your account is inactive. Please contact an administrator.";
+            return false;
+        }
+        if (student.getYearOfStudy() < Constants.MIN_YEAR_OF_STUDY) {
+            lastMessage = "You cannot apply yet. Minimum year of study is " + Constants.MIN_YEAR_OF_STUDY + ".";
+            return false;
+        }
+        if (student.getGpa() < Constants.MIN_GPA) {
+            lastMessage = "You cannot apply yet. Minimum GPA is " + Constants.MIN_GPA
+                    + ", but your current GPA is " + String.format("%.2f", student.getGpa()) + ".";
+            return false;
+        }
+        if (student.isHasDisciplineCase()) {
+            lastMessage = "You cannot apply while a discipline case is active on your profile.";
+            return false;
+        }
+        return true;
     }
 }

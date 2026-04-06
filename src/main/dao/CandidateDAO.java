@@ -302,7 +302,7 @@ public class CandidateDAO {
     public int getTargetElectionId(Integer facultyId, int positionId) {
         String sql;
         if (facultyId != null && facultyId > 0) {
-            sql = "SELECT election_id FROM elections WHERE position_id=? AND status=? AND (faculty_id=? OR faculty_id IS NULL) " +
+            sql = "SELECT election_id FROM elections WHERE position_id=? AND status=? AND faculty_id=? " +
                     "ORDER BY start_date ASC LIMIT 1";
         } else {
             sql = "SELECT election_id FROM elections WHERE position_id=? AND status=? AND faculty_id IS NULL " +

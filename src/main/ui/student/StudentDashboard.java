@@ -6,6 +6,7 @@ import main.services.AuthService;
 import main.services.ElectionService;
 import main.ui.RoleSelectionFrame;
 import main.utils.Constants;
+import main.utils.PositionRules;
 import main.utils.SessionManager;
 
 import javax.swing.*;
@@ -220,20 +221,14 @@ public class StudentDashboard extends JFrame {
             return false;
         }
 
-        String position = election.getPositionName() == null ? "" : election.getPositionName().toLowerCase();
-
-        if (position.contains("female") && !"FEMALE".equalsIgnoreCase(student.getGender())) {
-            return false;
-        }
-        if (position.contains("male") && !position.contains("female") && !"MALE".equalsIgnoreCase(student.getGender())) {
-            return false;
-        }
-
-        if ((position.contains("non-resident") || position.contains("non resident")) && student.isResident()) {
-            return false;
-        }
-        if (position.contains("resident") && !(position.contains("non-resident") || position.contains("non resident")) && !student.isResident()) {
-            return false;
+        PositionRules.PositionCategory category = PositionRules.classify(election.getPositionName());
+        if (PositionRules.isCanonical(category)) {
+            if (!PositionRules.isGenderEligible(student.getGender(), category)) {
+                return false;
+            }
+            if (!PositionRules.isResidencyEligible(student.isResident(), category)) {
+                return false;
+            }
         }
 
         return true;

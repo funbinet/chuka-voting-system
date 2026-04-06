@@ -7,6 +7,7 @@ import main.models.Position;
 import main.models.Student;
 import main.services.CandidateService;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -15,7 +16,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 public class ApplyForCandidacyDialog extends JDialog {
 
@@ -107,20 +110,65 @@ public class ApplyForCandidacyDialog extends JDialog {
     }
 
     private void loadPositions() {
+        positionCombo.removeAllItems();
+        Map<PositionRules.PositionCategory, Position> canonicalPositions =
+                new EnumMap<>(PositionRules.PositionCategory.class);
+
         try {
             Connection conn = DBConnection.getInstance().getConnection();
             PreparedStatement ps = conn.prepareStatement(
-                "SELECT p.*, f.faculty_name FROM positions p LEFT JOIN faculties f ON p.faculty_id = f.faculty_id ORDER BY p.position_name"
+                "SELECT position_id, position_name, faculty_id FROM positions ORDER BY position_id ASC"
             );
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
-                Position p = new Position(rs.getInt("position_id"), rs.getString("position_name"), rs.getInt("faculty_id"));
-                positionCombo.addItem(p);
+                PositionRules.PositionCategory category = PositionRules.classify(rs.getString("position_name"));
+                if (!PositionRules.isCanonical(category)) {
+                    continue;
+                }
+
+                int facultyId = rs.getObject("faculty_id") == null ? 0 : rs.getInt("faculty_id");
+                Position candidate = new Position(
+                        rs.getInt("position_id"),
+                        PositionRules.canonicalLabel(category),
+                        facultyId
+                );
+
+                Position existing = canonicalPositions.get(category);
+                if (shouldPrefer(candidate, existing)) {
+                    canonicalPositions.put(category, candidate);
+                }
+            }
+
+            for (PositionRules.PositionCategory category : PositionRules.CANONICAL_ORDER) {
+                Position option = canonicalPositions.get(category);
+                if (option != null) {
+                    positionCombo.addItem(option);
+                }
             }
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Error loading positions: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
+
+        if (positionCombo.getItemCount() == 0) {
+            JOptionPane.showMessageDialog(this,
+                    "No canonical positions are configured. Ask the admin to seed the five standard positions.",
+                    "Position Setup Required",
+                    JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private boolean shouldPrefer(Position candidate, Position existing) {
+        if (existing == null) {
+            return true;
+        }
+        if (candidate.getFacultyId() == 0 && existing.getFacultyId() > 0) {
+            return true;
+        }
+        if (candidate.getFacultyId() > 0 && existing.getFacultyId() == 0) {
+            return false;
+        }
+        return candidate.getPositionId() < existing.getPositionId();
     }
 
     private void loadCoalitions() {

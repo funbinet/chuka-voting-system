@@ -7,6 +7,7 @@ import main.models.Candidate;
 import main.models.Election;
 import main.models.Student;
 import main.utils.Constants;
+import main.utils.PositionRules;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -124,26 +125,23 @@ public class VotingService {
     }
 
     private String validatePositionEligibility(Student student, Election election) {
-        String position = election.getPositionName() == null ? "" : election.getPositionName().toLowerCase();
-
-        if (position.contains("female")) {
-            if (!"FEMALE".equalsIgnoreCase(student.getGender())) {
-                return "Only female students can vote for this position.";
-            }
-        } else if (position.contains("male")) {
-            if (!"MALE".equalsIgnoreCase(student.getGender())) {
-                return "Only male students can vote for this position.";
-            }
+        PositionRules.PositionCategory category = PositionRules.classify(election.getPositionName());
+        if (!PositionRules.isCanonical(category)) {
+            return null;
         }
 
-        if (position.contains("non-resident") || position.contains("non resident")) {
-            if (student.isResident()) {
-                return "Only non-resident students can vote for this position.";
-            }
-        } else if (position.contains("resident")) {
-            if (!student.isResident()) {
-                return "Only resident students can vote for this position.";
-            }
+        String roleName = PositionRules.canonicalLabel(category);
+
+        if (!PositionRules.isGenderEligible(student.getGender(), category)) {
+            return "Only " + PositionRules.requiredGender(category) + " students can vote for "
+                    + roleName + ". Your profile gender is "
+                    + PositionRules.displayGender(student.getGender()) + ".";
+        }
+
+        if (!PositionRules.isResidencyEligible(student.isResident(), category)) {
+            return "Only " + PositionRules.requiredResidencyLabel(category) + " students can vote for "
+                    + roleName + ". Your profile residency is "
+                    + PositionRules.profileResidencyLabel(student.isResident()) + ".";
         }
 
         return null;

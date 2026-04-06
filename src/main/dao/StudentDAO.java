@@ -2,6 +2,7 @@ package main.dao;
 
 import main.models.Student;
 import main.utils.PasswordHasher;
+import main.utils.PositionRules;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -248,17 +249,15 @@ public class StudentDAO {
             sql.append(" AND faculty_id = ?");
         }
 
-        String position = positionName == null ? "" : positionName.toLowerCase();
-        if (position.contains("female")) {
-            sql.append(" AND UPPER(gender) = 'FEMALE'");
-        } else if (position.contains("male")) {
-            sql.append(" AND UPPER(gender) = 'MALE'");
+        PositionRules.PositionCategory category = PositionRules.classify(positionName);
+        if (PositionRules.hasGenderRequirement(category)) {
+            sql.append(" AND UPPER(gender) = '").append(PositionRules.requiredGender(category)).append("'");
         }
 
-        if (position.contains("non-resident") || position.contains("non resident")) {
-            sql.append(" AND is_resident = FALSE");
-        } else if (position.contains("resident")) {
-            sql.append(" AND is_resident = TRUE");
+        if (PositionRules.hasResidencyRequirement(category)) {
+            sql.append(PositionRules.requiresResident(category)
+                    ? " AND is_resident = TRUE"
+                    : " AND is_resident = FALSE");
         }
 
         try (PreparedStatement ps = getConnection().prepareStatement(sql.toString())) {
