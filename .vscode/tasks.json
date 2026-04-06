@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Windows: Compile + Copy Resources",
+      "type": "shell",
+      "command": "echo This task is Windows-only. Use ./run.sh on Linux.",
+      "windows": {
+        "command": "cmd",
+        "args": [
+          "/d",
+          "/c",
+          "if not exist out\\vscode-bin mkdir out\\vscode-bin && dir /s /b src\\*.java > sources.txt && javac -cp \"lib/*\" -d out\\vscode-bin @sources.txt && del sources.txt && xcopy /e /i /y resources out\\vscode-bin >nul"
+        ]
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$javac"
+      ]
+    }
+  ]
+}

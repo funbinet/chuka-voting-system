@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Run Main (with resources)",
+      "request": "launch",
+      "mainClass": "main.Main",
+      "cwd": "${workspaceFolder}",
+      "classPaths": [
+        "$Auto",
+        "${workspaceFolder}/resources"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,10 @@ out/
 
 # IDE files
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
 *.iml
 .qodo/
 .dist/

@@ -130,6 +130,8 @@ Docker DB defaults for Linux flow:
 
 ## Quick Start (Windows)
 
+Windows flow does not use Docker and does not use `run.sh`. Docker automation is Linux-only in this project.
+
 1. Create DB schema:
 
 - Run `resources/db/schema.sql` in MySQL Workbench (or any MySQL client).
@@ -146,20 +148,24 @@ db.user=root
 db.password=your_password
 ```
 
-3. Compile:
+3. VS Code one-click build (recommended):
+
+- Run Task -> `Windows: Compile + Copy Resources`
+
+4. Manual compile alternative:
 
 ```powershell
-mkdir out
+mkdir out\vscode-bin
 dir /s /b src\*.java > sources.txt
-javac -cp "lib/*" -d out @sources.txt
+javac -cp "lib/*" -d out\vscode-bin @sources.txt
 del sources.txt
-xcopy /e /i /y resources out
+xcopy /e /i /y resources out\vscode-bin
 ```
 
-4. Run:
+5. Run:
 
 ```powershell
-java -cp "out;lib/*" main.Main
+java -cp "out\vscode-bin;lib/*" main.Main
 ```
 
 IDE note:
@@ -374,11 +380,51 @@ Fix:
 2. Confirm election scope (faculty/global) matches candidate profile.
 3. Refresh election statuses and candidate list in admin UI.
 
-### 8) Build works in terminal but IDE fails to find config/resources
+### 8) Build works in terminal but VS Code fails to find config/resources (Windows)
 
-Fix:
+Symptoms:
 
-- Mark `resources/` as resource folder in IDE, or copy resources into build output as in command-line steps.
+- App runs from terminal but fails from VS Code Run/Debug with missing `config.properties` or resource stream errors.
+
+Fix (recommended for VS Code):
+
+1. Ensure Java project settings use this workspace layout in `.vscode/settings.json`:
+
+```json
+{
+   "java.project.sourcePaths": ["src"],
+   "java.project.outputPath": "out/vscode-bin",
+   "java.project.referencedLibraries": ["lib/**/*.jar"]
+}
+```
+
+2. Add a launch profile that includes `resources/` on classpath in `.vscode/launch.json`:
+
+```json
+{
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "type": "java",
+         "name": "Run Main (with resources)",
+         "request": "launch",
+         "mainClass": "main.Main",
+         "cwd": "${workspaceFolder}",
+         "classPaths": ["$Auto", "${workspaceFolder}/resources"]
+      }
+   ]
+}
+```
+
+3. Run using the `Run Main (with resources)` profile.
+
+4. You can also run VS Code Task -> `Windows: Compile + Copy Resources` before debugging.
+
+Fallback (copy resources into build output like terminal flow):
+
+```powershell
+xcopy /e /i /y resources out\vscode-bin
+```
 
 ## Developer Notes
 
