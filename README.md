@@ -1,4 +1,4 @@
-# Chuka University Voting System (Kadi)
+# Chuka University Voting System
 
 A Java Swing election platform for university voting with student and admin portals, first-login OTP verification, candidacy workflows, coalition support, election lifecycle automation, and visual result analytics.
 
